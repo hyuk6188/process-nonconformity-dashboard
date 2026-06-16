@@ -51,7 +51,7 @@ function getSheet(name) {
 }
 
 function recordId(item) {
-  return [item['문서번호'] || item['臾몄꽌踰덊샇'] || '', item['순번'] || item['?쒕쾲'] || '1'].join('_');
+  return [item['문서번호'] || '', item['순번'] || '1'].join('_');
 }
 
 function itemId(item) {
