@@ -1484,7 +1484,7 @@ function shouldScaleLossAmount(record, amount) {
 
 function normalizedLossAmount(record, amount) {
   const n = Math.round(Number(amount) || 0);
-  return shouldScaleLossAmount(record, n) ? n * 10000 : n;
+  return shouldScaleLossAmount(record, n) ? n * 1000 : n;
 }
 
 function normalizeRecordAmount(record) {

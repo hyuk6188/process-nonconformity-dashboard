@@ -80,7 +80,7 @@ function normalizeRecordAmount(item) {
   const copy = Object.assign({}, item);
   if ('금액' in copy) {
     const amount = Math.round(Number(copy['금액']) || 0);
-    copy['금액'] = shouldScaleLossAmount(copy, amount) ? amount * 10000 : amount;
+    copy['금액'] = shouldScaleLossAmount(copy, amount) ? amount * 1000 : amount;
   }
   return copy;
 }
