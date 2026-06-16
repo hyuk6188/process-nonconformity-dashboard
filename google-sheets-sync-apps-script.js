@@ -71,20 +71,6 @@ function recordId(item) {
   return [item['문서번호'] || '', item['순번'] || '1'].join('_');
 }
 
-function shouldScaleLossAmount(item, amount) {
-  const docNo = String(item['문서번호'] || '');
-  return amount > 0 && amount < 1000 && /^부적합보고서\d{2}-/.test(docNo);
-}
-
-function normalizeRecordAmount(item) {
-  const copy = Object.assign({}, item);
-  if ('금액' in copy) {
-    const amount = Math.round(Number(copy['금액']) || 0);
-    copy['금액'] = shouldScaleLossAmount(copy, amount) ? amount * 1000 : amount;
-  }
-  return copy;
-}
-
 function itemId(item) {
   return item.id || Utilities.getUuid();
 }
@@ -96,8 +82,7 @@ function readJsonRows(sheetName) {
   const values = sheet.getRange(2, 1, lastRow - 1, 2).getValues();
   return values
     .filter(row => row[0] && row[1])
-    .map(row => JSON.parse(row[1]))
-    .map(item => sheetName === SHEETS.records ? normalizeRecordAmount(item) : item);
+    .map(row => JSON.parse(row[1]));
 }
 
 function upsertJsonRows(sheetName, items) {
@@ -108,10 +93,9 @@ function upsertJsonRows(sheetName, items) {
   let saved = 0;
 
   items.forEach(item => {
-    const normalized = sheetName === SHEETS.records ? normalizeRecordAmount(item) : item;
-    const id = recordId(normalized);
+    const id = recordId(item);
     if (!id || id === '_1') return;
-    const row = [id, JSON.stringify(normalized), now, 'dashboard'];
+    const row = [id, JSON.stringify(item), now, 'dashboard'];
     if (ids[id]) {
       sheet.getRange(ids[id], 1, 1, 4).setValues([row]);
     } else {
