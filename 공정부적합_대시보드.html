@@ -1104,14 +1104,27 @@ function drawDaily() {
     return true;
   }).sort();
   const items = keys.map(k=>({key:k,...DAILY_ALL[k]}));
-  const cnts  = keys.map(k=>DAILY_ALL[k].qty);
-  const amts  = keys.map(k=>DAILY_ALL[k].amt);
-  const lbl   = year?(month?`${year}년 ${parseInt(month)}월`+(week?` ${week}주`:'')+' 일별':`${year}년 일별`):'전체 일별';
-  document.getElementById('lbl-daily-cnt').textContent=lbl+' 일별 발생 수량';
-  document.getElementById('lbl-daily-amt').textContent=lbl+' 손실금액';
-  document.getElementById('day-filter-info').textContent=`${items.length}일 · 합계 ${items.reduce((s,it)=>s+it.qty,0).toLocaleString()}ea`;
-  // 레이블: 월~금 요일명 표시 (1일(월), 2일(화) ...)
-  const DOW = ['일','월','화','수','목','금','토'];
+  // Keep weekday chart slots stable even when only one day has data.
+  let chartKeys = keys;
+  if(month && effectiveWeek) {
+    const chartYear = year || (keys[0] ? keys[0].slice(0,4) : String(new Date().getFullYear()));
+    const lastDay = new Date(parseInt(chartYear), parseInt(month), 0).getDate();
+    chartKeys = [];
+    for(let day=1; day<=lastDay; day++) {
+      const k = chartYear + '-' + month + '-' + String(day).padStart(2,'0');
+      const dow = new Date(k).getDay();
+      if(dow!==0 && dow!==6 && dayWeekLabel(k)===effectiveWeek) chartKeys.push(k);
+    }
+  }
+  const emptyDay = k => ({key:k,lbl:k,cnt:0,qty:0,amt:0,cause:'-',reason:'-',dec:'-',discard:0,rework:0,byType:{}});
+  const chartItems = chartKeys.map(k=>({key:k,...(DAILY_ALL[k] || emptyDay(k))}));
+  const cnts  = chartItems.map(it=>it.qty || 0);
+  const amts  = chartItems.map(it=>it.amt ? it.amt : null);
+  const lbl   = year?(month?`${year}\uB144 ${parseInt(month)}\uC6D4`+(week?` ${week}\uC8FC`:'')+' \uC77C\uBCC4':`${year}\uB144 \uC77C\uBCC4`):'\uC804\uCCB4 \uC77C\uBCC4';
+  document.getElementById('lbl-daily-cnt').textContent=lbl+' \uC77C\uBCC4 \uBC1C\uC0DD \uC218\uB7C9';
+  document.getElementById('lbl-daily-amt').textContent=lbl+' \uC190\uC2E4\uAE08\uC561';
+  document.getElementById('day-filter-info').textContent=`${chartItems.length}\uC77C \u00B7 \uD569\uACC4 ${items.reduce((s,it)=>s+it.qty,0).toLocaleString()}ea`;
+  const DOW = ['\uC77C','\uC6D4','\uD654','\uC218','\uBAA9','\uAE08','\uD1A0'];
   const dLbl = k => {
     const dt = new Date(k); const dow = dt.getDay();
     const day = parseInt(k.slice(8));
@@ -1143,10 +1156,10 @@ function drawDaily() {
       // 같은 막대 재클릭 → 기본(마지막 날) 복원
       _dailySelectedIdx = null;
       renderPeriodTable('detail-daily', items, '#43a047', '일별');
-      document.getElementById('day-filter-info').textContent=`${items.length}일 · 합계 ${items.reduce((s,i2)=>s+i2.qty,0).toLocaleString()}ea`;
+      document.getElementById('day-filter-info').textContent=`${chartItems.length}\uC77C \u00B7 \uD569\uACC4 ${items.reduce((s,i2)=>s+i2.qty,0).toLocaleString()}ea`;
       _updateDailyKpi(_lastIt, true);
       const c = _charts['ch-daily'];
-      if(c) { c.data.datasets[0].backgroundColor = items.map(()=>'rgba(26,86,219,0.72)'); c.update(); }
+      if(c) { c.data.datasets[0].backgroundColor = chartItems.map(()=>'rgba(26,86,219,0.72)'); c.update(); }
     } else {
       _dailySelectedIdx = idx;
       renderPeriodTable('detail-daily', [it], '#43a047', '일별');
@@ -1154,15 +1167,15 @@ function drawDaily() {
       _updateDailyKpi(it, false);
       const c = _charts['ch-daily'];
       if(c) {
-        c.data.datasets[0].backgroundColor = items.map((_,i2)=>
+        c.data.datasets[0].backgroundColor = chartItems.map((_,i2)=>
           i2===idx ? 'rgba(26,86,219,1)' : 'rgba(26,86,219,0.28)'
         );
         c.update();
       }
     }
   }
-  makeChart('ch-daily','bar',keys.map(dLbl),cnts,'rgba(26,86,219,0.72)',false,items,'일별',_dailyBarClick);
-  makeChart('ch-daily-amt','line',keys.map(dLbl),amts,'rgb(194,65,12)',true,items,'일별');
+  makeChart('ch-daily','bar',chartKeys.map(dLbl),cnts,'rgba(26,86,219,0.72)',false,chartItems,'\uC77C\uBCC4',_dailyBarClick);
+  makeChart('ch-daily-amt','line',chartKeys.map(dLbl),amts,'rgb(194,65,12)',true,chartItems,'\uC77C\uBCC4');
   renderPeriodTable('detail-daily',items,'#43a047','일별');
   if(items.length) {
     _updateDailyKpi(_lastIt, true);
