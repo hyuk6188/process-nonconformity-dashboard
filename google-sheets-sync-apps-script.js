@@ -7,7 +7,12 @@ const SHEETS = {
 };
 
 function doGet(e) {
-  const action = (e.parameter.action || 'read').trim();
+  const action = ((e.parameter && e.parameter.action) || '').trim();
+  if (!action) {
+    return HtmlService.createHtmlOutputFromFile('index')
+      .setTitle('공정부적합 대시보드')
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  }
   if (action !== 'read') {
     return jsonOutput({ok: false, error: 'Unsupported action: ' + action}, e.parameter.callback);
   }

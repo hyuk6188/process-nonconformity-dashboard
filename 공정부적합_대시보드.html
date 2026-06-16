@@ -1396,8 +1396,8 @@ function syncUrl() {
 function openSyncAuth() {
   const url = syncUrl();
   if(!url) return;
-  showToast('Google ?? ?? ??? ?? ?? ???? ??? ? ? ???? ???????.');
-  window.open(url + '?action=read', '_blank', 'noopener');
+  showToast('새 탭에서 Google 시트 연동용 대시보드를 엽습니다. 회사 계정 로그인 후 사용하세요.');
+  window.open(url, '_blank', 'noopener');
 }
 
 async function syncRequest(action, payload) {
@@ -1504,8 +1504,8 @@ async function syncPullNow(quiet=false) {
     _syncReady = true;
     setSyncStatus('동기화 완료', 'ready');
   } catch(err) {
-    setSyncStatus('동기화 오류', 'error');
-    if(!quiet) showToast('Google 동기화 오류: ' + err.message);
+    setSyncStatus('권한 연결 필요', 'error');
+    if(!quiet) showToast('빨간 동기화 칩을 눌러 Google 시트 연동용 대시보드를 열어주세요: ' + err.message);
   } finally {
     _syncBusy = false;
   }
