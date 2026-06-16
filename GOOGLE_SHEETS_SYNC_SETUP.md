@@ -6,7 +6,7 @@ https://docs.google.com/spreadsheets/d/1iKBXYvK-wJ43oVpANLpT5R8wqXvc2VbGjrGqCp6z
 
 Current Apps Script web app:
 
-https://script.google.com/macros/s/AKfycbzuY5h0VXUW9jZ22vBTffEzacIaShqIkVLxmLSd6e4dlE65QWkFw22lRN56GN7vU7iN/exec
+https://script.google.com/a/macros/fursys.com/s/AKfycbyM6GxfYzyIBqLd3zPiPLfXBUtJ3xHJ9vHwhKUksHwTlt7D7MNJfWypKpji0J0Cwenq/exec
 
 The dashboard is already configured to use this URL. Users must be signed in to a Google account that can access the web app.
 
