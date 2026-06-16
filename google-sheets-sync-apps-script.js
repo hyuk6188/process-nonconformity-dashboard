@@ -22,18 +22,30 @@ function doGet(e) {
 function doPost(e) {
   try {
     const body = JSON.parse((e.postData && e.postData.contents) || '{}');
-    switch (body.action) {
-      case 'upsertRecords':
-        return jsonOutput(upsertJsonRows(SHEETS.records, body.records || []));
-      case 'replaceActionList':
-        return jsonOutput(replaceJsonRows(SHEETS.actionList, body.items || []));
-      case 'saveSetting':
-        return jsonOutput(saveSetting(body.key, body.value));
-      default:
-        return jsonOutput({ok: false, error: 'Unsupported action: ' + body.action});
-    }
+    return jsonOutput(handleWriteAction(body));
   } catch (err) {
     return jsonOutput({ok: false, error: err.message});
+  }
+}
+
+function apiRead() {
+  return readState();
+}
+
+function apiPost(body) {
+  return handleWriteAction(body || {});
+}
+
+function handleWriteAction(body) {
+  switch (body.action) {
+    case 'upsertRecords':
+      return upsertJsonRows(SHEETS.records, body.records || []);
+    case 'replaceActionList':
+      return replaceJsonRows(SHEETS.actionList, body.items || []);
+    case 'saveSetting':
+      return saveSetting(body.key, body.value);
+    default:
+      return {ok: false, error: 'Unsupported action: ' + body.action};
   }
 }
 

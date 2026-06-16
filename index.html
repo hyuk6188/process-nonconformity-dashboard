@@ -1368,7 +1368,7 @@ document.addEventListener('keydown', e=>{ if(e.key==='Escape') hideModal(); });
 const NEW_RECORDS = [];
 
 const SYNC_WEB_APP_URL = 'https://script.google.com/a/macros/fursys.com/s/AKfycbyM6GxfYzyIBqLd3zPiPLfXBUtJ3xHJ9vHwhKUksHwTlt7D7MNJfWypKpji0J0Cwenq/exec'; // Paste the Google Apps Script web app URL here.
-const SYNC_POLL_MS = 60000;
+const SYNC_POLL_MS = 5000;
 let _syncReady = false;
 let _syncBusy = false;
 let _syncTimer = null;
@@ -1403,6 +1403,9 @@ function openSyncAuth() {
 async function syncRequest(action, payload) {
   const url = syncUrl();
   if(!url) throw new Error('SYNC_WEB_APP_URL is empty');
+  if(window.google && google.script && google.script.run) {
+    return syncAppsScriptRun(action, payload);
+  }
   if(payload === undefined) {
     return syncJsonp(action);
   }
@@ -1415,6 +1418,19 @@ async function syncRequest(action, payload) {
     body
   });
   return {ok:true, opaque:true};
+}
+
+function syncAppsScriptRun(action, payload) {
+  return new Promise((resolve, reject) => {
+    const runner = google.script.run
+      .withSuccessHandler(resolve)
+      .withFailureHandler(err => reject(new Error(err && err.message ? err.message : String(err))));
+    if(payload === undefined && action === 'read') {
+      runner.apiRead();
+    } else {
+      runner.apiPost({action, ...(payload || {})});
+    }
+  });
 }
 function syncJsonp(action) {
   return new Promise((resolve, reject) => {
