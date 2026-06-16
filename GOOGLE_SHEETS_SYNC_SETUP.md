@@ -4,6 +4,12 @@ Google Spreadsheet:
 
 https://docs.google.com/spreadsheets/d/1iKBXYvK-wJ43oVpANLpT5R8wqXvc2VbGjrGqCp6zk7o/edit
 
+Current Apps Script web app:
+
+https://script.google.com/macros/s/AKfycbzuY5h0VXUW9jZ22vBTffEzacIaShqIkVLxmLSd6e4dlE65QWkFw22lRN56GN7vU7iN/exec
+
+The dashboard is already configured to use this URL. Users must be signed in to a Google account that can access the web app.
+
 ## 1. Create the Apps Script web app
 
 1. Open the spreadsheet above.

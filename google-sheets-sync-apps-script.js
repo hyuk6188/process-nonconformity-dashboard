@@ -9,9 +9,9 @@ const SHEETS = {
 function doGet(e) {
   const action = (e.parameter.action || 'read').trim();
   if (action !== 'read') {
-    return jsonOutput({ok: false, error: 'Unsupported action: ' + action});
+    return jsonOutput({ok: false, error: 'Unsupported action: ' + action}, e.parameter.callback);
   }
-  return jsonOutput(readState());
+  return jsonOutput(readState(), e.parameter.callback);
 }
 
 function doPost(e) {
@@ -153,8 +153,14 @@ function existingSettingMap(sheet) {
   }, {});
 }
 
-function jsonOutput(payload) {
+function jsonOutput(payload, callback) {
+  const json = JSON.stringify(payload);
+  if (callback) {
+    return ContentService
+      .createTextOutput(String(callback).replace(/[^\w.$]/g, '') + '(' + json + ');')
+      .setMimeType(ContentService.MimeType.JAVASCRIPT);
+  }
   return ContentService
-    .createTextOutput(JSON.stringify(payload))
+    .createTextOutput(json)
     .setMimeType(ContentService.MimeType.JSON);
 }
