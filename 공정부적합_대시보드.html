@@ -1628,6 +1628,28 @@ function showToast(msg) {
 }
 
 // ── 엑셀 일괄 가져오기 ──────────────────────────────────
+function refreshAfterDataChange(records=[]) {
+  const dates = (records || []).map(r => r && r['발생일']).filter(Boolean).sort();
+  const latestDate = dates[dates.length - 1];
+  if(latestDate) {
+    const y = latestDate.slice(0,4);
+    const m = latestDate.slice(5,7);
+    const sy = document.getElementById('sel-day-year');
+    const sm = document.getElementById('sel-day-month');
+    if(sy) sy.value = y;
+    if(sm) sm.value = m;
+    initDayWeekSelector();
+    const sw = document.getElementById('sel-day-week');
+    if(sw) sw.value = String(dayWeekLabel(latestDate));
+  } else {
+    initDayWeekSelector();
+  }
+  ['daily','weekly','monthly','yearly'].forEach(id => { _drawn[id] = false; });
+  const activeId = document.querySelector('.page.active')?.id?.replace('page-','') || 'daily';
+  _drawn[activeId] = true;
+  _drawTab(activeId);
+}
+
 function _importClientSide(file) {
   const COL = {
     '발생일':'발생일','날짜':'발생일',
@@ -1656,6 +1678,7 @@ function _importClientSide(file) {
       const rows = XLSX.utils.sheet_to_json(ws, {raw:false, dateNF:'yyyy-mm-dd'});
       if (!rows.length) { showToast('시트에 데이터가 없습니다'); return; }
       let added=0, skipped=0, deleted=0;
+      const importedRecords = [];
       rows.forEach((row,idx) => {
         const mapped={};
         Object.entries(row).forEach(([h,v]) => {
@@ -1689,14 +1712,14 @@ function _importClientSide(file) {
           회사구분:mapped['회사구분']||'', 등록자:mapped['등록자']||'',
           _new:true
         };
+        importedRecords.push(rec);
         NEW_RECORDS.push(rec); RAW_DATA.push(rec); added++;
       });
       reaggregate();
-      const activeId=document.querySelector('.page.active')?.id?.replace('page-','');
-      if(activeId){_drawn[activeId]=true;_drawTab(activeId);}
+      refreshAfterDataChange(importedRecords);
       document.getElementById('new-cnt').textContent=NEW_RECORDS.length;
       showToast(`✅ 가져오기 완료: ${added}건 추가${skipped?', '+skipped+'건 건너뜀':''}${deleted?' (삭제'+deleted+'건 제외)':''}`);
-      if(added>0) autoSave(NEW_RECORDS);
+      if(added>0) autoSave(importedRecords);
     } catch(err) { showToast('파일 읽기 오류: '+err.message); }
   };
   reader.readAsArrayBuffer(file);
