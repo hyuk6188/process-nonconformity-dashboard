@@ -1380,7 +1380,12 @@ function setSyncStatus(text, mode='') {
   const label = document.getElementById('sync-text');
   const authBtn = document.getElementById('sync-auth-btn');
   if(label) label.textContent = text;
-  if(chip) chip.className = 'sync-chip' + (mode ? ' ' + mode : '');
+  if(chip) {
+    chip.className = 'sync-chip' + (mode ? ' ' + mode : '');
+    chip.title = mode === 'error' ? 'Google ?? ??? ?????. ???? ?????.' : 'Google Sheets ??? ??';
+    chip.onclick = mode === 'error' ? openSyncAuth : null;
+    chip.style.cursor = mode === 'error' ? 'pointer' : '';
+  }
   if(authBtn) authBtn.style.display = mode === 'error' ? 'inline-flex' : 'none';
 }
 
@@ -1390,7 +1395,9 @@ function syncUrl() {
 
 function openSyncAuth() {
   const url = syncUrl();
-  if(url) window.open(url + '?action=read', '_blank', 'noopener');
+  if(!url) return;
+  showToast('Google ?? ?? ??? ?? ?? ???? ??? ? ? ???? ???????.');
+  window.open(url + '?action=read', '_blank', 'noopener');
 }
 
 async function syncRequest(action, payload) {
