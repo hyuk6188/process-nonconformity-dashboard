@@ -1477,8 +1477,24 @@ function recordSyncId(r) {
   return [r['문서번호'] || '', r['순번'] || '1'].join('_');
 }
 
+function shouldScaleLossAmount(record, amount) {
+  const docNo = String(record['문서번호'] || '');
+  return amount > 0 && amount < 1000 && /^부적합보고서\d{2}-/.test(docNo);
+}
+
+function normalizedLossAmount(record, amount) {
+  const n = Math.round(Number(amount) || 0);
+  return shouldScaleLossAmount(record, n) ? n * 10000 : n;
+}
+
+function normalizeRecordAmount(record) {
+  const copy = {...record};
+  if ('금액' in copy) copy['금액'] = normalizedLossAmount(copy, copy['금액']);
+  return copy;
+}
+
 function normalizeRemoteRecords(records) {
-  return (records || []).filter(Boolean).map(r => ({...r, _synced:true}));
+  return (records || []).filter(Boolean).map(r => ({...normalizeRecordAmount(r), _synced:true}));
 }
 
 function redrawCurrentPage() {
@@ -1487,23 +1503,40 @@ function redrawCurrentPage() {
   _drawTab(activeId);
 }
 
+function comparableRecord(record) {
+  const copy = {...record};
+  delete copy._new;
+  delete copy._synced;
+  return JSON.stringify(copy);
+}
+
 function mergeRemoteRecords(records) {
   const incoming = normalizeRemoteRecords(records);
   if(!incoming.length) return 0;
-  const seen = new Set(RAW_DATA.map(recordSyncId));
-  const addedRecords = [];
+  const indexById = new Map(RAW_DATA.map((record, index) => [recordSyncId(record), index]));
+  const changedRecords = [];
+  const newRecords = [];
   incoming.forEach(rec => {
     const id = recordSyncId(rec);
-    if(!id || seen.has(id)) return;
-    RAW_DATA.unshift(rec);
-    seen.add(id);
-    addedRecords.push(rec);
+    if(!id) return;
+    if(indexById.has(id)) {
+      const index = indexById.get(id);
+      if(comparableRecord(RAW_DATA[index]) !== comparableRecord(rec)) {
+        RAW_DATA[index] = {...RAW_DATA[index], ...rec, _synced:true};
+        changedRecords.push(rec);
+      }
+      return;
+    }
+    newRecords.push(rec);
+    indexById.set(id, -1);
+    changedRecords.push(rec);
   });
-  if(addedRecords.length) {
+  if(newRecords.length) RAW_DATA.unshift(...newRecords);
+  if(changedRecords.length) {
     reaggregate();
-    refreshAfterDataChange(addedRecords);
+    refreshAfterDataChange(changedRecords);
   }
-  return addedRecords.length;
+  return changedRecords.length;
 }
 
 function applyRemoteState(data, quiet=false) {
@@ -1709,6 +1742,7 @@ function _importClientSide(file) {
         const amtRaw=Math.round(parseFloat(mapped['금액'])||0);
         const unitP=Math.round(parseFloat(mapped['단가'])||0);
         const qty=parseInt(mapped['부적합수량'])||0;
+        const lossAmount=normalizedLossAmount({'문서번호':docno}, amtRaw>0?amtRaw:unitP*qty);
         const rec={
           발생일:d, 문서번호:docno, 순번:seqNum,
           품목명:mapped['품목명']||'', 품목코드:mapped['품목코드']||'',
@@ -1719,7 +1753,7 @@ function _importClientSide(file) {
           발생원인상세:mapped['발생원인상세']||'',
           설비명:mapped['설비명']||'', 색상:mapped['색상']||'',
           발생원인:mapped['발생원인']||'',
-          부적합수량:qty, 금액:amtRaw>0?amtRaw:unitP*qty,
+          부적합수량:qty, 금액:lossAmount,
           처리결정:mapped['처리결정']||'',
           진행단계:mapped['진행단계']||'등록',
           회사구분:mapped['회사구분']||'', 등록자:mapped['등록자']||'',
