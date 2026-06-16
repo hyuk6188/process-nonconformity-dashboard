@@ -1491,19 +1491,19 @@ function mergeRemoteRecords(records) {
   const incoming = normalizeRemoteRecords(records);
   if(!incoming.length) return 0;
   const seen = new Set(RAW_DATA.map(recordSyncId));
-  let added = 0;
+  const addedRecords = [];
   incoming.forEach(rec => {
     const id = recordSyncId(rec);
     if(!id || seen.has(id)) return;
     RAW_DATA.unshift(rec);
     seen.add(id);
-    added++;
+    addedRecords.push(rec);
   });
-  if(added) {
+  if(addedRecords.length) {
     reaggregate();
-    redrawCurrentPage();
+    refreshAfterDataChange(addedRecords);
   }
-  return added;
+  return addedRecords.length;
 }
 
 function applyRemoteState(data, quiet=false) {
