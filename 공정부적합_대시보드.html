@@ -1863,44 +1863,71 @@ function weekKeyJS(dateStr) {
 }
 function reaggregate() {
   const D={}, W={}, M={}, Y={};
+  const text = {
+    date: '발생일', qty: '부적합수량', amt: '금액',
+    cause: '원인공정', reason: '발생원인', dec: '처리결정',
+    type: '부적합유형', detail: '부적합상세정보', name: '공정부적합명',
+    equip: '설비명', color: '색상', item: '품목명',
+    unknown: '미기재', discard: '폐기', rework: '재작업', repair: '수리', raw: '원자재부적합'
+  };
+  function ensureBucket(obj, k, lbl) {
+    if(!obj[k]) obj[k]={lbl,cnt:0,qty:0,amt:0,cause:{},reason:{},dec:{},byType:{}};
+    return obj[k];
+  }
+  function addToBucket(bucket, r) {
+    const qty = Number(r[text.qty]) || 0;
+    const amt = Number(r[text.amt]) || 0;
+    const cause = r[text.cause] || text.unknown;
+    const reason = r[text.reason] || text.unknown;
+    const dec = r[text.dec] || text.unknown;
+    const type = r[text.type] || r[text.detail] || r[text.name] || text.unknown;
+    const groupKey = type === text.raw ? 'color' : 'equip';
+    const byNameKey = (groupKey === 'color' ? r[text.color] : r[text.equip]) || text.unknown;
+    const itemName = r[text.item] || r[text.name] || text.unknown;
+    bucket.cnt++; bucket.qty += qty; bucket.amt += amt;
+    bucket.cause[cause]=(bucket.cause[cause]||0)+1;
+    bucket.reason[reason]=(bucket.reason[reason]||0)+1;
+    bucket.dec[dec]=(bucket.dec[dec]||0)+1;
+    if(!bucket.byType[type]) bucket.byType[type]={cnt:0,qty:0,amt:0,byName:{},groupKey};
+    const tv = bucket.byType[type];
+    tv.cnt++; tv.qty += qty; tv.amt += amt; tv.groupKey = groupKey;
+    if(!tv.byName[byNameKey]) tv.byName[byNameKey]={cnt:0,qty:0,amt:0,items:{}};
+    const nv = tv.byName[byNameKey];
+    nv.cnt++; nv.qty += qty; nv.amt += amt;
+    if(!nv.items[itemName]) nv.items[itemName]={cnt:0,qty:0,amt:0};
+    nv.items[itemName].cnt++; nv.items[itemName].qty += qty; nv.items[itemName].amt += amt;
+  }
   RAW_DATA.forEach(r=>{
-    const date=r['발생일']||''; if(!date) return;
+    const date = r[text.date] || '';
+    if(!date) return;
     const wk=weekKeyJS(date), mo=date.slice(0,7), yr=date.slice(0,4);
-    const cause=r['원인공정']||'미기재';
-    const reason=r['발생원인']||'미기재';
-    const dec=r['처리결정']||'미기재';
-    [
-      [D, date, date],
-      [W, wk, wk],
-      [M, mo, mo.replace('-','년 ')+'월'],
-      [Y, yr, yr+'년']
-    ].forEach(([obj, k, lbl])=>{
-      if(!obj[k]) obj[k]={lbl,cnt:0,qty:0,amt:0,cause:{},reason:{},dec:{}};
-      obj[k].cnt++; obj[k].qty+=r['부적합수량']; obj[k].amt+=r['금액'];
-      obj[k].cause[cause]=(obj[k].cause[cause]||0)+1;
-      obj[k].reason[reason]=(obj[k].reason[reason]||0)+1;
-      obj[k].dec[dec]=(obj[k].dec[dec]||0)+1;
-    });
+    [[D,date,date],[W,wk,wk],[M,mo,mo.replace('-','년 ')+'월'],[Y,yr,yr+'년']].forEach(([obj,k,lbl])=>addToBucket(ensureBucket(obj,k,lbl), r));
   });
+  function topKey(obj) {
+    const keys = Object.keys(obj || {});
+    return keys.length ? keys.reduce((a,b)=>obj[a]>obj[b]?a:b, keys[0]) : '-';
+  }
   function flatten(obj) {
     const out={};
     Object.entries(obj).forEach(([k,v])=>{
-      const tc=v.cause,tr=v.reason,td=v.dec;
       out[k]={
         lbl: v.lbl, cnt: v.cnt, qty: v.qty, amt: v.amt,
-        cause: Object.keys(tc).reduce((a,b)=>tc[a]>tc[b]?a:b,Object.keys(tc)[0]||'-'),
-        reason: Object.keys(tr).reduce((a,b)=>tr[a]>tr[b]?a:b,Object.keys(tr)[0]||'-'),
-        dec: Object.keys(td).reduce((a,b)=>td[a]>td[b]?a:b,Object.keys(td)[0]||'-'),
-        discard: td['폐기']||0,
-        rework: (td['재작업']||0)+(td['수리']||0)
+        cause: topKey(v.cause), reason: topKey(v.reason), dec: topKey(v.dec),
+        discard: v.dec[text.discard] || 0,
+        rework: (v.dec[text.rework] || 0) + (v.dec[text.repair] || 0),
+        byType: v.byType
       };
     });
     return out;
   }
-  Object.assign(DAILY_ALL,   flatten(D));
-  Object.assign(WEEKLY_ALL,  flatten(W));
-  Object.assign(MONTHLY_ALL, flatten(M));
-  Object.assign(YEARLY_ALL,  flatten(Y));
+  function replaceAggregate(target, source) {
+    Object.keys(target).forEach(k => delete target[k]);
+    Object.assign(target, source);
+  }
+  replaceAggregate(DAILY_ALL, flatten(D));
+  replaceAggregate(WEEKLY_ALL, flatten(W));
+  replaceAggregate(MONTHLY_ALL, flatten(M));
+  replaceAggregate(YEARLY_ALL, flatten(Y));
 }
 
 // ── JSON 내보내기 ─────────────────────────────────────────
