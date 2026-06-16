@@ -52,6 +52,14 @@
   .app-stat-lbl{font-size:10px;color:var(--text-3)}
   .app-updated{font-size:11px;color:var(--text-3);padding-left:16px;border-left:0.5px solid var(--border)}
 
+  .sync-chip{display:flex;align-items:center;gap:7px;border:0.5px solid var(--border);background:var(--surface-2);color:var(--text-2);border-radius:999px;padding:6px 10px;font-size:11px;white-space:nowrap}
+  .sync-dot{width:7px;height:7px;border-radius:50%;background:#9ca3af;box-shadow:0 0 0 2px rgba(156,163,175,.14)}
+  .sync-chip.ready .sync-dot{background:#16a34a;box-shadow:0 0 0 2px rgba(22,163,74,.14)}
+  .sync-chip.busy .sync-dot{background:#1a56db;box-shadow:0 0 0 2px rgba(26,86,219,.14)}
+  .sync-chip.error .sync-dot{background:#dc2626;box-shadow:0 0 0 2px rgba(220,38,38,.14)}
+  .sync-btn{background:var(--surface);border:0.5px solid var(--border);border-radius:999px;color:var(--text-2);padding:6px 10px;font-size:11px;cursor:pointer;white-space:nowrap}
+  .sync-btn:hover{color:var(--accent);border-color:var(--accent)}
+
   /* ── 탭 ── */
   .tabs{
     display:flex;
@@ -372,6 +380,8 @@
       <button class="export-btn" onclick="exportNewRecords()">↓ JSON 내보내기 (<span id="new-cnt">0</span>건)</button>
     </div>
     <div class="app-updated">2026년 06월 15일 기준</div>
+    <div class="sync-chip" id="sync-chip" title="Google Sheets sync status"><span class="sync-dot"></span><span id="sync-text">Sync checking</span></div>
+    <button class="sync-btn" onclick="syncPullNow()">Sheet refresh</button>
   </div>
 </header>
 
@@ -683,7 +693,7 @@
   <div style="margin-top:20px">
     <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:8px">특이사항</div>
     <textarea id="al-note" placeholder="특이사항을 입력하세요..."
-      oninput="localStorage.setItem('al_note_v1',this.value)"
+      oninput="localStorage.setItem('al_note_v1',this.value);syncNoteDebounced(this.value)"
       style="width:100%;min-height:90px;background:var(--surface-2);border:0.5px solid var(--border);
              border-radius:var(--radius);color:var(--text);padding:10px 12px;font-size:13px;
              font-family:inherit;resize:vertical;box-sizing:border-box;outline:none;line-height:1.6">
@@ -1356,6 +1366,172 @@ document.addEventListener('keydown', e=>{ if(e.key==='Escape') hideModal(); });
 // ── 데이터 입력 ──────────────────────────────────────────
 const NEW_RECORDS = [];
 
+const SYNC_WEB_APP_URL = ''; // Paste the Google Apps Script web app URL here.
+const SYNC_POLL_MS = 60000;
+let _syncReady = false;
+let _syncBusy = false;
+let _syncTimer = null;
+let _syncActionTimer = null;
+let _syncNoteTimer = null;
+
+function setSyncStatus(text, mode='') {
+  const chip = document.getElementById('sync-chip');
+  const label = document.getElementById('sync-text');
+  if(label) label.textContent = text;
+  if(chip) chip.className = 'sync-chip' + (mode ? ' ' + mode : '');
+}
+
+function syncUrl() {
+  return (SYNC_WEB_APP_URL || '').trim();
+}
+
+async function syncRequest(action, payload) {
+  const url = syncUrl();
+  if(!url) throw new Error('SYNC_WEB_APP_URL is empty');
+  if(payload === undefined) {
+    const sep = url.includes('?') ? '&' : '?';
+    const res = await fetch(url + sep + 'action=' + encodeURIComponent(action) + '&t=' + Date.now(), {cache:'no-store'});
+    if(!res.ok) throw new Error('HTTP ' + res.status);
+    return res.json();
+  }
+  const res = await fetch(url, {
+    method:'POST',
+    headers:{'Content-Type':'text/plain;charset=utf-8'},
+    body: JSON.stringify({action, ...payload})
+  });
+  if(!res.ok) throw new Error('HTTP ' + res.status);
+  return res.json();
+}
+
+function recordSyncId(r) {
+  return [r['????'] || r['??????'] || '', r['??'] || r['???'] || '1'].join('_');
+}
+
+function normalizeRemoteRecords(records) {
+  return (records || []).filter(Boolean).map(r => ({...r, _synced:true}));
+}
+
+function redrawCurrentPage() {
+  const activeId = document.querySelector('.page.active')?.id?.replace('page-','') || 'daily';
+  _drawn[activeId] = true;
+  _drawTab(activeId);
+}
+
+function mergeRemoteRecords(records) {
+  const incoming = normalizeRemoteRecords(records);
+  if(!incoming.length) return 0;
+  const seen = new Set(RAW_DATA.map(recordSyncId));
+  let added = 0;
+  incoming.forEach(rec => {
+    const id = recordSyncId(rec);
+    if(!id || seen.has(id)) return;
+    RAW_DATA.unshift(rec);
+    seen.add(id);
+    added++;
+  });
+  if(added) {
+    reaggregate();
+    redrawCurrentPage();
+  }
+  return added;
+}
+
+function applyRemoteState(data, quiet=false) {
+  const added = mergeRemoteRecords(data.records || []);
+  if(Array.isArray(data.actionItems)) {
+    AL_ITEMS = data.actionItems;
+    localStorage.setItem(AL_KEY, JSON.stringify(AL_ITEMS));
+    alRender();
+  }
+  if(typeof data.note === 'string') {
+    localStorage.setItem('al_note_v1', data.note);
+    const noteEl = document.getElementById('al-note');
+    if(noteEl && noteEl.value !== data.note) noteEl.value = data.note;
+  }
+  if(!quiet && added) showToast('Loaded ' + added + ' records from Google Sheets');
+}
+
+async function syncPullNow(quiet=false) {
+  if(!syncUrl()) { setSyncStatus('Sync not configured'); return; }
+  if(_syncBusy) return;
+  _syncBusy = true;
+  setSyncStatus('Syncing Sheets', 'busy');
+  try {
+    const data = await syncRequest('read');
+    if(data && data.ok === false) throw new Error(data.error || 'sync failed');
+    applyRemoteState(data || {}, quiet);
+    _syncReady = true;
+    setSyncStatus('Sheets synced', 'ready');
+  } catch(err) {
+    setSyncStatus('Sync error', 'error');
+    if(!quiet) showToast('Google Sheets sync error: ' + err.message);
+  } finally {
+    _syncBusy = false;
+  }
+}
+
+function syncCleanRecords(records) {
+  return (records || []).map(r => {
+    const c = {...r};
+    delete c._new;
+    delete c._synced;
+    return c;
+  });
+}
+
+async function syncPushRecords(records) {
+  if(!records || !records.length || !syncUrl()) return;
+  try {
+    setSyncStatus('Saving Sheets', 'busy');
+    const data = await syncRequest('upsertRecords', {records: syncCleanRecords(records)});
+    if(data && data.ok === false) throw new Error(data.error || 'save failed');
+    records.forEach(r => { delete r._new; r._synced = true; });
+    setSyncStatus('Saved to Sheets', 'ready');
+    showToast('Google Sheets saved (' + records.length + ' records)');
+  } catch(err) {
+    setSyncStatus('Save error', 'error');
+    showToast('Google Sheets save failed: ' + err.message);
+  }
+}
+
+function syncActionListDebounced() {
+  if(!syncUrl()) return;
+  clearTimeout(_syncActionTimer);
+  _syncActionTimer = setTimeout(async () => {
+    try {
+      setSyncStatus('Saving Action List', 'busy');
+      const data = await syncRequest('replaceActionList', {items: AL_ITEMS});
+      if(data && data.ok === false) throw new Error(data.error || 'save failed');
+      setSyncStatus('Saved to Sheets', 'ready');
+    } catch(err) {
+      setSyncStatus('Save error', 'error');
+      showToast('Action List save failed: ' + err.message);
+    }
+  }, 500);
+}
+
+function syncNoteDebounced(value) {
+  if(!syncUrl()) return;
+  clearTimeout(_syncNoteTimer);
+  _syncNoteTimer = setTimeout(async () => {
+    try {
+      const data = await syncRequest('saveSetting', {key:'al_note_v1', value});
+      if(data && data.ok === false) throw new Error(data.error || 'save failed');
+      setSyncStatus('Saved to Sheets', 'ready');
+    } catch(err) {
+      setSyncStatus('Save error', 'error');
+    }
+  }, 700);
+}
+
+function initDashboardSync() {
+  if(!syncUrl()) { setSyncStatus('Sync not configured'); return; }
+  syncPullNow(true);
+  clearInterval(_syncTimer);
+  _syncTimer = setInterval(() => syncPullNow(true), SYNC_POLL_MS);
+}
+
+
 function openEntryForm() {
   document.getElementById('entry-overlay').classList.add('show');
   // 오늘 날짜 기본값
@@ -1556,17 +1732,24 @@ function saveEntry() {
 const _IS_LOCAL = ['localhost','127.0.0.1'].includes(location.hostname);
 function autoSave(records) {
   if(!records || !records.length) return;
-  if(!_IS_LOCAL) return; // 정적 호스팅(GitHub Pages 등)에서는 서버 없음
+  if(syncUrl()) {
+    syncPushRecords(records);
+    return;
+  }
+  if(!_IS_LOCAL) {
+    showToast('Sync URL is not configured. Use JSON export for manual backup.');
+    return;
+  }
   const clean = records.map(r=>{const c={...r};delete c._new;return c;});
   fetch('/api/save',{
     method:'POST',
     headers:{'Content-Type':'application/json'},
     body: JSON.stringify(clean)
   }).then(r=>r.json()).then(d=>{
-    if(d.ok) showToast(`☁ 자동저장 완료 (${d.saved}건 저장)`);
-    else showToast('저장 오류: '+d.error, true);
+    if(d.ok) showToast(`Auto-save complete (${d.saved} records)`);
+    else showToast('Save error: '+d.error, true);
   }).catch(()=>{
-    showToast('서버 연결 안 됨 - JSON 내보내기로 수동 저장하세요');
+    showToast('Server is not connected. Use JSON export for manual backup.');
   });
 }
 
