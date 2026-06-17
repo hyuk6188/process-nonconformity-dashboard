@@ -8,6 +8,9 @@ const SHEETS = {
 
 function doGet(e) {
   const action = ((e.parameter && e.parameter.action) || '').trim();
+  if (action === 'bridge') {
+    return bridgeOutput(e.parameter.requestId || '');
+  }
   if (!action) {
     return HtmlService.createHtmlOutputFromFile('index')
       .setTitle('공정부적합 대시보드')
@@ -40,6 +43,33 @@ function apiRead() {
 
 function apiPost(body) {
   return handleWriteAction(body || {});
+}
+
+function bridgeOutput(requestId) {
+  const safeRequestId = JSON.stringify(String(requestId || ''));
+  const html = `
+<!doctype html>
+<html>
+<body>
+<script>
+(function() {
+  const requestId = ${safeRequestId};
+  function send(payload) {
+    parent.postMessage({type:'sheet-sync-bridge', requestId, payload}, '*');
+  }
+  google.script.run
+    .withSuccessHandler(send)
+    .withFailureHandler(function(err) {
+      send({ok:false, error: err && err.message ? err.message : String(err || 'sync bridge failed')});
+    })
+    .apiRead();
+})();
+</script>
+</body>
+</html>`;
+  return HtmlService.createHtmlOutput(html)
+    .setTitle('Sheet Sync Bridge')
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
 function handleWriteAction(body) {
