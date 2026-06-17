@@ -1022,6 +1022,29 @@ function bindKpiDblClick(kpiId, color, periodType, items) {
 
 // ── 일별 탭 ──────────────────────────────────────────────
 // 날짜 → 해당 주의 수요일 기반 월내 주차 레이블 (예: "2주")
+function makePeriodDetailClick(detailId, allItems, color, periodLabel, chartId, infoId) {
+  let selectedIdx = null;
+  const totalQty = () => allItems.reduce((sum, item) => sum + (item.qty || 0), 0);
+  return function(it, idx) {
+    const reset = selectedIdx === idx;
+    selectedIdx = reset ? null : idx;
+    renderPeriodTable(detailId, reset ? allItems : [it], color, periodLabel);
+    if(infoId) {
+      const info = document.getElementById(infoId);
+      if(info) info.textContent = reset
+        ? allItems.length + '개 ? 합계 ' + totalQty().toLocaleString() + 'ea'
+        : (it.lbl || it.key) + ' ? ' + (it.qty || 0).toLocaleString() + 'ea 선택됨';
+    }
+    const chart = _charts[chartId];
+    if(chart && chart.data && chart.data.datasets && chart.data.datasets[0]) {
+      chart.data.datasets[0].backgroundColor = allItems.map((_, i) =>
+        selectedIdx === null ? 'rgba(26,86,219,0.72)' : (i === idx ? 'rgba(26,86,219,1)' : 'rgba(26,86,219,0.28)')
+      );
+      chart.update();
+    }
+  };
+}
+
 function dayWeekLabel(dateStr) {
   const ms = 86400000;
   const d = new Date(dateStr);
@@ -1239,7 +1262,7 @@ function drawWeekly() {
   };
   // lbl 필드를 포맷된 라벨로 교체 (테이블·KPI에서 "YYYY-Www" 대신 표시)
   items.forEach((it, i) => { it.lbl = wLbl(keys[i]); });
-  makeChart('ch-weekly','bar',keys.map(wLbl),cnts,'rgba(26,86,219,0.72)',false,items,'주별');
+  makeChart('ch-weekly','bar',keys.map(wLbl),cnts,'rgba(26,86,219,0.72)',false,items,'주별',makePeriodDetailClick('detail-weekly',items,'#8e24aa','주별','ch-weekly','week-filter-info'));
   makeChart('ch-weekly-amt','line',keys.map(wLbl),amts,'rgb(194,65,12)',true,items,'주별');
   renderPeriodTable('detail-weekly',items,'#8e24aa','주별');
   if(items.length) {
@@ -1280,7 +1303,7 @@ function drawMonthly() {
   document.getElementById('lbl-monthly-amt').textContent=lbl+' 손실금액';
   document.getElementById('month-filter-info').textContent=`${items.length}개월 · 합계 ${items.reduce((s,it)=>s+it.cnt,0).toLocaleString()}건`;
   const mLbl = k => year ? parseInt(k.slice(5))+'월' : k.replace('-','년 ')+'월';
-  makeChart('ch-monthly-tab','bar',keys.map(mLbl),cnts,'rgba(26,86,219,0.72)',false,items,'월별');
+  makeChart('ch-monthly-tab','bar',keys.map(mLbl),cnts,'rgba(26,86,219,0.72)',false,items,'월별',makePeriodDetailClick('detail-monthly',items,'#00acc1','월별','ch-monthly-tab','month-filter-info'));
   makeChart('ch-monthly-amt-tab','line',keys.map(mLbl),amts,'rgb(194,65,12)',true,items,'월별');
   renderPeriodTable('detail-monthly',items,'#00acc1','월별');
   if(items.length) {
@@ -1307,7 +1330,7 @@ function drawYearly() {
   const yCnt = keys.map(k=>YEARLY_ALL[k].cnt);
   const yAmt = keys.map(k=>YEARLY_ALL[k].amt);
   const yLbl = keys.map(k=>YEARLY_ALL[k].lbl);
-  makeChart('ch-yearly-cnt','bar',yLbl,yCnt,'rgba(26,86,219,0.72)',false,items,'연별');
+  makeChart('ch-yearly-cnt','bar',yLbl,yCnt,'rgba(26,86,219,0.72)',false,items,'연별',makePeriodDetailClick('detail-yearly',items,'#1e88e5','연별','ch-yearly-cnt'));
   makeChart('ch-yearly-amt','line',yLbl,yAmt,'rgb(194,65,12)',true,items,'연별');
   renderPeriodTable('detail-yearly',items,'#1e88e5','연별');
   if(items.length) {
