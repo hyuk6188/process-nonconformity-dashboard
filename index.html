@@ -943,6 +943,94 @@ function updateKpi(kpiId, cards) {
 
 // ── 차트 인스턴스 관리 ────────────────────────────────────
 const _charts = {};
+function drawFallbackChart(id, type, labels, data, color, isAmt, items, onPointClick) {
+  const canvas = document.getElementById(id);
+  if(!canvas) return;
+  const box = canvas.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  const width = Math.max(320, Math.floor(box.width || canvas.parentElement?.clientWidth || 600));
+  const height = Math.max(180, Math.floor(box.height || canvas.parentElement?.clientHeight || 190));
+  canvas.width = width * dpr;
+  canvas.height = height * dpr;
+  canvas.style.width = width + 'px';
+  canvas.style.height = height + 'px';
+  const ctx = canvas.getContext('2d');
+  if(!ctx) return;
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,width,height);
+  const pad = {left:48,right:18,top:24,bottom:36};
+  const plotW = Math.max(1, width - pad.left - pad.right);
+  const plotH = Math.max(1, height - pad.top - pad.bottom);
+  const values = (data || []).map(v => Number(v) || 0);
+  const max = Math.max(1, ...values);
+  ctx.strokeStyle = 'rgba(0,0,0,.08)';
+  ctx.fillStyle = '#6b6b66';
+  ctx.font = '10px sans-serif';
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'middle';
+  for(let i=0;i<=4;i++) {
+    const y = pad.top + plotH - plotH * i / 4;
+    ctx.beginPath(); ctx.moveTo(pad.left,y); ctx.lineTo(width-pad.right,y); ctx.stroke();
+    const tick = max * i / 4;
+    ctx.fillText(isAmt ? amtFmt(tick) : Math.round(tick).toLocaleString(), pad.left - 6, y);
+  }
+  ctx.strokeStyle = 'rgba(0,0,0,.18)';
+  ctx.beginPath(); ctx.moveTo(pad.left,pad.top); ctx.lineTo(pad.left,pad.top+plotH); ctx.lineTo(width-pad.right,pad.top+plotH); ctx.stroke();
+  const n = Math.max(1, values.length);
+  const step = plotW / n;
+  const points = values.map((v,i) => ({
+    x: pad.left + step * i + step / 2,
+    y: pad.top + plotH - (v / max) * plotH,
+    v,
+    i
+  }));
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  labels.forEach((label,i) => {
+    const x = pad.left + step * i + step / 2;
+    ctx.fillStyle = '#6b6b66';
+    ctx.fillText(String(label || ''), x, pad.top + plotH + 10);
+  });
+  if(type === 'bar') {
+    const barW = Math.min(150, Math.max(8, step * 0.58));
+    points.forEach(p => {
+      const h = pad.top + plotH - p.y;
+      ctx.fillStyle = color || 'rgba(26,86,219,0.72)';
+      ctx.fillRect(p.x - barW/2, p.y, barW, h);
+      if(p.v) {
+        ctx.fillStyle = '#1a1a18';
+        ctx.textBaseline = 'bottom';
+        ctx.fillText(Math.round(p.v).toLocaleString(), p.x, p.y - 5);
+      }
+    });
+  } else {
+    const lineColor = color || 'rgb(194,65,12)';
+    ctx.strokeStyle = lineColor;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    points.forEach((p,i) => { if(i===0) ctx.moveTo(p.x,p.y); else ctx.lineTo(p.x,p.y); });
+    ctx.stroke();
+    points.forEach(p => {
+      ctx.fillStyle = lineColor;
+      ctx.beginPath(); ctx.arc(p.x,p.y,4,0,Math.PI*2); ctx.fill();
+      if(p.v) {
+        ctx.fillStyle = '#1a1a18';
+        ctx.textBaseline = 'bottom';
+        ctx.fillText(isAmt ? Math.round(p.v/10000).toLocaleString() : Math.round(p.v).toLocaleString(), p.x, p.y - 7);
+      }
+    });
+  }
+  canvas.style.cursor = items && items.length ? 'pointer' : '';
+  canvas.onclick = e => {
+    if(!items || !items.length || !onPointClick) return;
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    let idx = Math.floor((x - pad.left) / step);
+    idx = Math.max(0, Math.min(items.length - 1, idx));
+    onPointClick(items[idx], idx);
+  };
+  _charts[id] = {fallback:true, update(){ drawFallbackChart(id, type, labels, data, color, isAmt, items, onPointClick); }, destroy(){ canvas.onclick = null; }};
+}
 function makeChart(id, type, labels, data, color, isAmt, items, periodType, onBarClick) {
   if(_charts[id]) _charts[id].destroy();
   const datalabelsPlugin = {
@@ -960,10 +1048,12 @@ function makeChart(id, type, labels, data, color, isAmt, items, periodType, onBa
              y:{beginAtZero:true,grid:{color:gridColor},
                ticks:isAmt?{callback:amtFmt}:{}}} };
   if(typeof Chart === 'undefined') {
-    console.warn('Chart.js is not ready; skipping chart render:', id);
+    console.warn('Chart.js is not ready; using fallback chart:', id);
+    drawFallbackChart(id, type, labels, data, color, isAmt, items, onBarClick);
     return;
   }
   const chartPlugins = (typeof ChartDataLabels !== 'undefined') ? [ChartDataLabels] : [];
+  try {
   _charts[id] = new Chart(document.getElementById(id), {
     type, data:{labels, datasets:[{
       label: isAmt?'손실금액':'건수', data,
@@ -975,6 +1065,11 @@ function makeChart(id, type, labels, data, color, isAmt, items, periodType, onBa
     }]}, options:opts,
     plugins: chartPlugins
   });
+  } catch(err) {
+    console.error('Chart.js render failed; using fallback chart:', id, err);
+    drawFallbackChart(id, type, labels, data, color, isAmt, items, onBarClick);
+    return;
+  }
   // 클릭/더블클릭 → 상세테이블 필터 + 더블클릭은 팝업
   if(items && items.length) {
     const canvas = document.getElementById(id);
@@ -1179,18 +1274,18 @@ function drawDaily() {
   const chartItems = chartKeys.map(k => ({key:k, ...(DAILY_ALL[k] || emptyDay(k))}));
   const cnts = chartItems.map(it => it.qty || 0);
   const amts = chartItems.map(it => it.amt || 0);
-  const DOW = ['?','?','?','?','?','?','?'];
+  const DOW = ['\uC77C','\uC6D4','\uD654','\uC218','\uBAA9','\uAE08','\uD1A0'];
   const dLbl = k => {
     const dt = parseLocalDate(k);
     const day = parseInt(k.slice(8), 10);
-    return month ? `${day}(${DOW[dt.getDay()]})` : year ? `${k.slice(5)}(${DOW[dt.getDay()]})` : k;
+    return month ? day + '(' + DOW[dt.getDay()] + ')' : year ? k.slice(5) + '(' + DOW[dt.getDay()] + ')' : k;
   };
-  const lbl = year ? (month ? `${year}? ${parseInt(month,10)}?` + (week ? ` ${week}?` : '') + ' ??' : `${year}? ??`) : '?? ??';
-  document.getElementById('lbl-daily-cnt').textContent = lbl + ' ?? ??';
-  document.getElementById('lbl-daily-amt').textContent = lbl + ' ????';
+  const lbl = year ? (month ? year + '\uB144 ' + parseInt(month,10) + '\uC6D4' + (week ? ' ' + week + '\uC8FC' : '') + ' \uC77C\uBCC4' : year + '\uB144 \uC77C\uBCC4') : '\uC804\uCCB4 \uC77C\uBCC4';
+  document.getElementById('lbl-daily-cnt').textContent = lbl + ' \uBC1C\uC0DD \uC218\uB7C9';
+  document.getElementById('lbl-daily-amt').textContent = lbl + ' \uC190\uC2E4\uAE08\uC561';
 
   function periodSummary(sourceItems) {
-    const summary = {key:'', lbl:'?? ??', cnt:0, qty:0, amt:0, byType:{}};
+    const summary = {key:'', lbl:'\uC120\uD0DD \uAE30\uAC04', cnt:0, qty:0, amt:0, byType:{}};
     (sourceItems || []).forEach(it => {
       summary.cnt += it.cnt || 0;
       summary.qty += it.qty || 0;
@@ -1213,47 +1308,45 @@ function drawDaily() {
     });
     const top = Object.entries(typeQty).sort((a,b) => b[1] - a[1] || (typeCnt[b[0]] || 0) - (typeCnt[a[0]] || 0))[0];
     updateKpi('kpi-daily',[
-      {lbl:'??? ??', val:(kpiIt.qty || 0).toLocaleString(), sub:'ea', color:'#e53935'},
-      {lbl:'?? ??', val:(kpiIt.amt || 0).toLocaleString(), sub:'?', color:'#e53935'},
-      {lbl:'?? ??? ??', val:top ? top[0] : '-', sub:(top ? top[1] : 0).toLocaleString() + 'ea', color:'#43a047'}
+      {lbl:'\uBD80\uC801\uD569 \uC218\uB7C9', val:(kpiIt.qty || 0).toLocaleString(), sub:'ea', color:'#e53935'},
+      {lbl:'\uC190\uC2E4 \uAE08\uC561', val:(kpiIt.amt || 0).toLocaleString(), sub:'\uC6D0', color:'#e53935'},
+      {lbl:'\uC8FC\uC694 \uBD80\uC801\uD569 \uC720\uD615', val:top ? top[0] : '-', sub:(top ? top[1] : 0).toLocaleString() + 'ea', color:'#43a047'}
     ]);
   }
 
   const periodIt = periodSummary(items);
-  document.getElementById('day-filter-info').textContent = `${chartItems.length}? ? ?? ${(periodIt.qty || 0).toLocaleString()}ea`;
-  renderPeriodTable('detail-daily', items, '#43a047', '??');
+  document.getElementById('day-filter-info').textContent = chartItems.length + '\uC77C \u00B7 \uD569\uACC4 ' + (periodIt.qty || 0).toLocaleString() + 'ea';
+  renderPeriodTable('detail-daily', items, '#43a047', '\uC77C\uBCC4');
   updateDailyKpi(periodIt);
-  if(items.length) bindKpiDblClick('kpi-daily','#43a047','??',items);
+  if(items.length) bindKpiDblClick('kpi-daily','#43a047','\uC77C\uBCC4',items);
 
   let selectedIdx = null;
   function dailyPointClick(it, idx) {
     if(selectedIdx === idx) {
       selectedIdx = null;
-      renderPeriodTable('detail-daily', items, '#43a047', '??');
+      renderPeriodTable('detail-daily', items, '#43a047', '\uC77C\uBCC4');
       updateDailyKpi(periodIt);
-      document.getElementById('day-filter-info').textContent = `${chartItems.length}? ? ?? ${(periodIt.qty || 0).toLocaleString()}ea`;
+      document.getElementById('day-filter-info').textContent = chartItems.length + '\uC77C \u00B7 \uD569\uACC4 ' + (periodIt.qty || 0).toLocaleString() + 'ea';
       const bar = _charts['ch-daily'];
-      if(bar) { bar.data.datasets[0].backgroundColor = chartItems.map(()=>'rgba(26,86,219,0.72)'); bar.update(); }
+      if(bar && bar.data) { bar.data.datasets[0].backgroundColor = chartItems.map(()=>'rgba(26,86,219,0.72)'); bar.update(); }
       return;
     }
     selectedIdx = idx;
-    renderPeriodTable('detail-daily', it.qty || it.amt || it.cnt ? [it] : [], '#43a047', '??');
+    renderPeriodTable('detail-daily', it.qty || it.amt || it.cnt ? [it] : [], '#43a047', '\uC77C\uBCC4');
     updateDailyKpi(it);
-    document.getElementById('day-filter-info').textContent = `${it.lbl || it.key} ? ${(it.qty || 0).toLocaleString()}ea ? ${(it.amt || 0).toLocaleString()}? ???`;
+    document.getElementById('day-filter-info').textContent = (it.lbl || it.key) + ' \u00B7 ' + (it.qty || 0).toLocaleString() + 'ea \u00B7 ' + (it.amt || 0).toLocaleString() + '\uC6D0 \uC120\uD0DD\uB428';
     const bar = _charts['ch-daily'];
-    if(bar) {
+    if(bar && bar.data) {
       bar.data.datasets[0].backgroundColor = chartItems.map((_,i) => i===idx ? 'rgba(26,86,219,1)' : 'rgba(26,86,219,0.28)');
       bar.update();
     }
   }
 
-  try { makeChart('ch-daily','bar',chartKeys.map(dLbl),cnts,'rgba(26,86,219,0.72)',false,chartItems,'??',dailyPointClick); }
-  catch(err) { console.error('Daily count chart render failed:', err); }
-  try { makeChart('ch-daily-amt','line',chartKeys.map(dLbl),amts,'rgb(194,65,12)',true,chartItems,'??',dailyPointClick); }
-  catch(err) { console.error('Daily amount chart render failed:', err); }
+  makeChart('ch-daily','bar',chartKeys.map(dLbl),cnts,'rgba(26,86,219,0.72)',false,chartItems,'\uC77C\uBCC4',dailyPointClick);
+  makeChart('ch-daily-amt','line',chartKeys.map(dLbl),amts,'rgb(194,65,12)',true,chartItems,'\uC77C\uBCC4',dailyPointClick);
 }
 
-// ??
+// \uC8FC\uBCC4
 function wedDateOfWeek(weekKey) {
   const ms = 86400000;
   const [yStr, wStr] = weekKey.split('-W');
