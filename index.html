@@ -1045,14 +1045,15 @@ function makePeriodDetailClick(detailId, allItems, color, periodLabel, chartId, 
   };
 }
 
+function parseLocalDate(dateStr) {
+  const [y, m, d] = String(dateStr).split('-').map(Number);
+  return new Date(y, (m || 1) - 1, d || 1);
+}
+
 function dayWeekLabel(dateStr) {
-  const ms = 86400000;
-  const d = new Date(dateStr);
-  const dow = (d.getDay() + 6) % 7;
-  const wed = new Date(d.getTime() - dow * ms + 2 * ms);
-  const firstDow = (new Date(wed.getFullYear(), wed.getMonth(), 1).getDay() + 6) % 7;
-  const firstWedDay = 1 + (2 - firstDow + 7) % 7;
-  return Math.floor((wed.getDate() - firstWedDay) / 7) + 1;  // 주차 숫자 반환
+  const d = parseLocalDate(dateStr);
+  const firstDow = (new Date(d.getFullYear(), d.getMonth(), 1).getDay() + 6) % 7; // Mon=0
+  return Math.floor((d.getDate() + firstDow - 1) / 7) + 1;
 }
 
 function initDaySelectors() {
@@ -1120,7 +1121,7 @@ function drawDaily() {
     if(year && !k.startsWith(year)) return false;
     if(month && k.slice(5,7)!==month) return false;
     // 토(6), 일(0) 제외
-    const dow = new Date(k).getDay();
+    const dow = parseLocalDate(k).getDay();
     if(dow===0||dow===6) return false;
     // 주차 필터: 월 선택 시 항상 특정 주 5일만 표시
     if(month && effectiveWeek && dayWeekLabel(k)!==effectiveWeek) return false;
@@ -1135,7 +1136,7 @@ function drawDaily() {
     chartKeys = [];
     for(let day=1; day<=lastDay; day++) {
       const k = chartYear + '-' + month + '-' + String(day).padStart(2,'0');
-      const dow = new Date(k).getDay();
+      const dow = parseLocalDate(k).getDay();
       if(dow!==0 && dow!==6 && dayWeekLabel(k)===effectiveWeek) chartKeys.push(k);
     }
   }
@@ -1149,14 +1150,14 @@ function drawDaily() {
   document.getElementById('day-filter-info').textContent=`${chartItems.length}\uC77C \u00B7 \uD569\uACC4 ${items.reduce((s,it)=>s+it.qty,0).toLocaleString()}ea`;
   const DOW = ['\uC77C','\uC6D4','\uD654','\uC218','\uBAA9','\uAE08','\uD1A0'];
   const dLbl = k => {
-    const dt = new Date(k); const dow = dt.getDay();
+    const dt = parseLocalDate(k); const dow = dt.getDay();
     const day = parseInt(k.slice(8));
     return month ? `${day}(${DOW[dow]})` : year ? `${k.slice(5)}(${DOW[dow]})` : k;
   };
   // KPI를 특정 날짜 항목으로 업데이트
   const DOW2=['일','월','화','수','목','금','토'];
   function _updateDailyKpi(kpiIt, isLast) {
-    const kpiDow = DOW2[new Date(kpiIt.key).getDay()];
+    const kpiDow = DOW2[parseLocalDate(kpiIt.key).getDay()];
     const kpiDay = parseInt(kpiIt.key.slice(8));
     const kpiLblSuffix = (isLast ? `전일(${kpiDay}일(${kpiDow})) 기준` : `${kpiDay}일(${kpiDow}) 기준`);
     const _tc={}, _tq={};
@@ -1901,7 +1902,7 @@ function autoSave(records) {
 // ── 재집계 ────────────────────────────────────────────────
 function weekKeyJS(dateStr) {
   const ms = 86400000;
-  const d = new Date(dateStr);
+  const d = parseLocalDate(dateStr);
   const dow = (d.getDay() + 6) % 7;          // Mon=0 … Sun=6
   const mon = new Date(d.getTime() - dow * ms);
   const wed = new Date(mon.getTime() + 2 * ms);
