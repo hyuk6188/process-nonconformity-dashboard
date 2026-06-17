@@ -1566,13 +1566,14 @@ function mergeRemoteRecords(records) {
   if(newRecords.length) RAW_DATA.unshift(...newRecords);
   if(changedRecords.length) {
     reaggregate();
-    refreshAfterDataChange(changedRecords);
   }
   return changedRecords.length;
 }
 
 function applyRemoteState(data, quiet=false) {
-  const added = mergeRemoteRecords(data.records || []);
+  const remoteRecords = Array.isArray(data.records) ? data.records : [];
+  const added = mergeRemoteRecords(remoteRecords);
+  if(remoteRecords.length) refreshAfterDataChange();
   if(Array.isArray(data.actionItems)) {
     AL_ITEMS = data.actionItems;
     localStorage.setItem(AL_KEY, JSON.stringify(AL_ITEMS));
@@ -1707,7 +1708,7 @@ function showToast(msg) {
 
 // ── 엑셀 일괄 가져오기 ──────────────────────────────────
 function refreshAfterDataChange(records=[]) {
-  const latestDate = latestRecordDate(records && records.length ? records : RAW_DATA);
+  const latestDate = latestRecordDate(RAW_DATA);
   if(!selectDailyDate(latestDate)) initDayWeekSelector();
   ['daily','weekly','monthly','yearly'].forEach(id => { _drawn[id] = false; });
   const activeId = document.querySelector('.page.active')?.id?.replace('page-','') || 'daily';
