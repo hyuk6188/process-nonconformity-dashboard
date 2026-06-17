@@ -1715,7 +1715,7 @@ function _importClientSide(file) {
         return Math.round(Number(cleaned) || 0);
       };
       if (!rows.length) { showToast('시트에 데이터가 없습니다'); return; }
-      let added=0, skipped=0, deleted=0;
+      let added=0, updated=0, skipped=0, deleted=0;
       const importedRecords = [];
       rows.forEach((row,idx) => {
         const mapped={};
@@ -1730,7 +1730,7 @@ function _importClientSide(file) {
         const ncname=(mapped['공정부적합명']||'').replace(/\[C[0-9]+\]$/,'').trim();
         const docno=mapped['문서번호']||`XL-${d}-${String(idx+1).padStart(4,'0')}`;
         const seqNum=mapped['순번']?String(parseInt(mapped['순번'])||1):String(idx+1);
-        if(RAW_DATA.find(r=>r['문서번호']===docno&&String(r['순번']||'')===seqNum)){skipped++;return;}
+        const existingIndex=RAW_DATA.findIndex(r=>r['문서번호']===docno&&String(r['순번']||'')===seqNum);
         const qty=parseInt(mapped['부적합수량'])||0;
         const lossAmount=toNumber(abAmountAt(idx));
         const rec={
@@ -1750,13 +1750,18 @@ function _importClientSide(file) {
           _new:true
         };
         importedRecords.push(rec);
-        NEW_RECORDS.push(rec); RAW_DATA.push(rec); added++;
+        if(existingIndex>=0){
+          RAW_DATA[existingIndex] = {...RAW_DATA[existingIndex], ...rec, _new:false, _synced:false};
+          updated++;
+        } else {
+          NEW_RECORDS.push(rec); RAW_DATA.push(rec); added++;
+        }
       });
       reaggregate();
       refreshAfterDataChange(importedRecords);
       document.getElementById('new-cnt').textContent=NEW_RECORDS.length;
-      showToast(`✅ 가져오기 완료: ${added}건 추가${skipped?', '+skipped+'건 건너뜀':''}${deleted?' (삭제'+deleted+'건 제외)':''}`);
-      if(added>0) autoSave(importedRecords);
+      showToast(`✅ 가져오기 완료: ${added}건 추가${updated?', '+updated+'건 업데이트':''}${skipped?', '+skipped+'건 건너뜀':''}${deleted?' (삭제'+deleted+'건 제외)':''}`);
+      if(importedRecords.length>0) autoSave(importedRecords);
     } catch(err) { showToast('파일 읽기 오류: '+err.message); }
   };
   reader.readAsArrayBuffer(file);
