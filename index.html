@@ -1455,8 +1455,7 @@ document.addEventListener('keydown', e=>{ if(e.key==='Escape') hideModal(); });
 // ── 데이터 입력 ──────────────────────────────────────────
 const NEW_RECORDS = [];
 
-const SYNC_WEB_APP_URL = 'https://script.google.com/a/macros/fursys.com/s/AKfycbyM6GxfYzyIBqLd3zPiPLfXBUtJ3xHJ9vHwhKUksHwTlt7D7MNJfWypKpji0J0Cwenq/exec';
-const SYNC_FALLBACK_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbyM6GxfYzyIBqLd3zPiPLfXBUtJ3xHJ9vHwhKUksHwTlt7D7MNJfWypKpji0J0Cwenq/exec';
+const SYNC_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbyM6GxfYzyIBqLd3zPiPLfXBUtJ3xHJ9vHwhKUksHwTlt7D7MNJfWypKpji0J0Cwenq/exec';
 const SYNC_POLL_MS = 5000;
 let _syncReady = false;
 let _syncBusy = false;
@@ -1471,7 +1470,7 @@ function setSyncStatus(text, mode='') {
   if(label) label.textContent = text;
   if(chip) {
     chip.className = 'sync-chip' + (mode ? ' ' + mode : '');
-    chip.title = mode === 'error' ? 'Google 시트 연결을 확인해주세요. 클릭하면 회사 계정 연동 페이지를 엽니다.' : 'Google Sheets 동기화 상태';
+    chip.title = mode === 'error' ? 'Google ?? ??? ?????. ?? ????? ?? ?????.' : 'Google Sheets ??? ??';
     chip.onclick = mode === 'error' ? openSyncAuth : null;
     chip.style.cursor = mode === 'error' ? 'pointer' : '';
   }
@@ -1481,16 +1480,10 @@ function setSyncStatus(text, mode='') {
 function syncUrl() {
   return (SYNC_WEB_APP_URL || '').trim();
 }
-function syncUrls() {
-  return [SYNC_WEB_APP_URL, SYNC_FALLBACK_WEB_APP_URL]
-    .map(url => (url || '').trim())
-    .filter((url, index, urls) => url && urls.indexOf(url) === index);
-}
-
 function openSyncAuth() {
   const url = syncUrl();
   if(!url) return;
-  showToast('\uC0C8 \uD0ED\uC5D0\uC11C \uD68C\uC0AC \uACC4\uC815\uC6A9 Google \uC2DC\uD2B8 \uC5F0\uB3D9 \uB300\uC2DC\uBCF4\uB4DC\uB97C \uC5FD\uB2C8\uB2E4. \uB85C\uADF8\uC778 \uD6C4 \uB2E4\uC2DC \uC0C8\uB85C\uACE0\uCE68\uD558\uC138\uC694.');
+  showToast('Google ?? ??? ??? ? ??? ???.');
   window.open(url, '_blank', 'noopener');
 }
 
@@ -1501,7 +1494,7 @@ async function syncRequest(action, payload) {
     return syncAppsScriptRun(action, payload);
   }
   if(payload === undefined) {
-    return action === 'read' ? syncReadWithFallback(action) : syncJsonp(action, url);
+    return syncJsonp(action, url);
   }
   const body = JSON.stringify({action, ...payload});
   await fetch(url, {
@@ -1512,23 +1505,6 @@ async function syncRequest(action, payload) {
     body
   });
   return {ok:true, opaque:true};
-}
-
-async function syncReadWithFallback(action) {
-  let lastError = null;
-  for(const url of syncUrls()) {
-    try {
-      return await syncBridgeRead(url);
-    } catch(err) {
-      lastError = err;
-    }
-    try {
-      return await syncJsonp(action, url);
-    } catch(err) {
-      lastError = err;
-    }
-  }
-  throw lastError || new Error('\u0047\u006f\u006f\u0067\u006c\u0065 \uC2DC\uD2B8 \uB3D9\uAE30\uD654\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4');
 }
 
 function syncAppsScriptRun(action, payload) {
