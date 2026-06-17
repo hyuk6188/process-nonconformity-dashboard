@@ -1056,17 +1056,41 @@ function dayWeekLabel(dateStr) {
   return Math.floor((d.getDate() + firstDow - 1) / 7) + 1;
 }
 
+function latestRecordDate(records) {
+  return (records || [])
+    .map(r => r && r['발생일'])
+    .filter(Boolean)
+    .sort()
+    .pop() || '';
+}
+
+function selectDailyDate(dateText) {
+  if(!dateText) return false;
+  const y = dateText.slice(0,4);
+  const m = dateText.slice(5,7);
+  const sy = document.getElementById('sel-day-year');
+  const sm = document.getElementById('sel-day-month');
+  if(sy) sy.value = y;
+  if(sm) sm.value = m;
+  initDayWeekSelector();
+  const sw = document.getElementById('sel-day-week');
+  if(sw) sw.value = String(dayWeekLabel(dateText));
+  return true;
+}
+
 function initDaySelectors() {
   const sy = document.getElementById('sel-day-year');
   DAY_YEARS.forEach(y=>{ const o=document.createElement('option'); o.value=y; o.textContent=y+'년'; sy.appendChild(o); });
-  // 기본값: 현재 년+월
-  const now = new Date();
-  const curY = String(now.getFullYear());
-  const curM = String(now.getMonth()+1).padStart(2,'0');
-  if(DAY_YEARS.includes(curY)) sy.value = curY;
-  else if(DAY_YEARS.length) sy.value = DAY_YEARS[0];
-  document.getElementById('sel-day-month').value = curM;
-  initDayWeekSelector();
+  const latestDate = latestRecordDate(RAW_DATA);
+  if(!selectDailyDate(latestDate)) {
+    const now = new Date();
+    const curY = String(now.getFullYear());
+    const curM = String(now.getMonth()+1).padStart(2,'0');
+    if(DAY_YEARS.includes(curY)) sy.value = curY;
+    else if(DAY_YEARS.length) sy.value = DAY_YEARS[0];
+    document.getElementById('sel-day-month').value = curM;
+    initDayWeekSelector();
+  }
 }
 
 // 월 변경 시 주 selector 재구성 후 필터 적용
@@ -1683,21 +1707,8 @@ function showToast(msg) {
 
 // ── 엑셀 일괄 가져오기 ──────────────────────────────────
 function refreshAfterDataChange(records=[]) {
-  const dates = (records || []).map(r => r && r['발생일']).filter(Boolean).sort();
-  const latestDate = dates[dates.length - 1];
-  if(latestDate) {
-    const y = latestDate.slice(0,4);
-    const m = latestDate.slice(5,7);
-    const sy = document.getElementById('sel-day-year');
-    const sm = document.getElementById('sel-day-month');
-    if(sy) sy.value = y;
-    if(sm) sm.value = m;
-    initDayWeekSelector();
-    const sw = document.getElementById('sel-day-week');
-    if(sw) sw.value = String(dayWeekLabel(latestDate));
-  } else {
-    initDayWeekSelector();
-  }
+  const latestDate = latestRecordDate(records && records.length ? records : RAW_DATA);
+  if(!selectDailyDate(latestDate)) initDayWeekSelector();
   ['daily','weekly','monthly','yearly'].forEach(id => { _drawn[id] = false; });
   const activeId = document.querySelector('.page.active')?.id?.replace('page-','') || 'daily';
   _drawn[activeId] = true;
