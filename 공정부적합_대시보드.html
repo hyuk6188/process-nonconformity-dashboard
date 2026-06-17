@@ -1624,17 +1624,32 @@ function mergeRemoteRecords(records) {
 
 function applyRemoteState(data, quiet=false) {
   const remoteRecords = Array.isArray(data.records) ? data.records : [];
-  const added = mergeRemoteRecords(remoteRecords);
-  if(remoteRecords.length) refreshAfterDataChange();
-  if(Array.isArray(data.actionItems)) {
-    AL_ITEMS = data.actionItems;
-    localStorage.setItem(AL_KEY, JSON.stringify(AL_ITEMS));
-    alRender();
+  let added = 0;
+  try {
+    added = mergeRemoteRecords(remoteRecords);
+  } catch(err) {
+    console.warn('Sheet records were received but could not be merged:', err);
   }
-  if(typeof data.note === 'string') {
-    localStorage.setItem('al_note_v1', data.note);
-    const noteEl = document.getElementById('al-note');
-    if(noteEl && noteEl.value !== data.note) noteEl.value = data.note;
+  if(remoteRecords.length) {
+    try {
+      refreshAfterDataChange();
+    } catch(err) {
+      console.warn('Sheet records were received but the dashboard refresh failed:', err);
+    }
+  }
+  try {
+    if(Array.isArray(data.actionItems)) {
+      AL_ITEMS = data.actionItems;
+      localStorage.setItem(AL_KEY, JSON.stringify(AL_ITEMS));
+      alRender();
+    }
+    if(typeof data.note === 'string') {
+      localStorage.setItem('al_note_v1', data.note);
+      const noteEl = document.getElementById('al-note');
+      if(noteEl && noteEl.value !== data.note) noteEl.value = data.note;
+    }
+  } catch(err) {
+    console.warn('Sheet action list/settings sync failed:', err);
   }
   if(!quiet && added) showToast('시트에서 ' + added + '건을 불러왔습니다');
 }
