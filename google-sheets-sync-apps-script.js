@@ -13,7 +13,7 @@ function doGet(e) {
       .setTitle('공정부적합 대시보드')
       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
   }
-  if (action === 'repairLossTotal') {
+  if (action.toLowerCase().startsWith('repairlosstotal')) {
     return jsonOutput(
       repairRecordsTotalForDate(e.parameter.date || '2026-06-15', Number(e.parameter.amount || 1679415)),
       e.parameter.callback
