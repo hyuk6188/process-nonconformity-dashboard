@@ -1319,15 +1319,44 @@ function drawMonthly() {
   const year = document.getElementById('sel-month-year').value;
   const keys = Object.keys(MONTHLY_ALL).filter(k=>{const y=parseInt(k);return y>=2000&&y<=2027&&(!year||k.startsWith(year));}).sort();
   const items= keys.map(k=>({key:k,...MONTHLY_ALL[k]}));
-  const cnts = keys.map(k=>MONTHLY_ALL[k].cnt);
-  const amts = keys.map(k=>MONTHLY_ALL[k].amt);
+  const itemByKey = Object.fromEntries(items.map(it => [it.key, it]));
+  const chartKeys = year
+    ? Array.from({length:12}, (_, i) => year + '-' + String(i + 1).padStart(2, '0'))
+    : keys;
+  const emptyMonth = k => ({key:k,lbl:k,cnt:0,qty:0,amt:0,cause:'-',reason:'-',dec:'-',discard:0,rework:0,byType:{},_empty:true});
+  const chartItems = chartKeys.map(k => itemByKey[k] || emptyMonth(k));
+  const cnts = chartItems.map(it => it._empty ? null : it.cnt);
+  const amts = chartItems.map(it => it._empty ? null : it.amt);
   const lbl  = year?year+'년 월별':'전체 월별';
   document.getElementById('lbl-monthly-cnt').textContent=lbl+' 발생 건수';
   document.getElementById('lbl-monthly-amt').textContent=lbl+' 손실금액';
   document.getElementById('month-filter-info').textContent=`${items.length}개월 · 합계 ${items.reduce((s,it)=>s+it.cnt,0).toLocaleString()}건`;
   const mLbl = k => year ? parseInt(k.slice(5))+'월' : k.replace('-','년 ')+'월';
-  makeChart('ch-monthly-tab','bar',keys.map(mLbl),cnts,'rgba(26,86,219,0.72)',false,items,'월별',makePeriodDetailClick('detail-monthly',items,'#00acc1','월별','ch-monthly-tab','month-filter-info'));
-  makeChart('ch-monthly-amt-tab','line',keys.map(mLbl),amts,'rgb(194,65,12)',true,items,'월별');
+  const updateMonthlyChartHighlight = (selectedIdx) => {
+    const chart = _charts['ch-monthly-tab'];
+    if(chart && chart.data && chart.data.datasets && chart.data.datasets[0]) {
+      chart.data.datasets[0].backgroundColor = chartItems.map((entry, i) => {
+        if(entry._empty) return 'rgba(26,86,219,0.08)';
+        return selectedIdx === null ? 'rgba(26,86,219,0.72)' : (i === selectedIdx ? 'rgba(26,86,219,1)' : 'rgba(26,86,219,0.28)');
+      });
+      chart.update();
+    }
+  };
+  let selectedMonthIdx = null;
+  const onMonthlyClick = (it, idx) => {
+    if(!it || it._empty) return;
+    const reset = selectedMonthIdx === idx;
+    selectedMonthIdx = reset ? null : idx;
+    renderPeriodTable('detail-monthly', reset ? items : [it], '#00acc1', '월별');
+    const info = document.getElementById('month-filter-info');
+    if(info) info.textContent = reset
+      ? `${items.length}개월 · 합계 ${items.reduce((s,item)=>s+item.cnt,0).toLocaleString()}건`
+      : `${mLbl(it.key)} · ${(it.qty || 0).toLocaleString()}ea 선택됨`;
+    updateMonthlyChartHighlight(selectedMonthIdx);
+  };
+  makeChart('ch-monthly-tab','bar',chartKeys.map(mLbl),cnts,'rgba(26,86,219,0.72)',false,chartItems,'월별',onMonthlyClick);
+  updateMonthlyChartHighlight(null);
+  makeChart('ch-monthly-amt-tab','line',chartKeys.map(mLbl),amts,'rgb(194,65,12)',true,chartItems,'월별');
   renderPeriodTable('detail-monthly',items,'#00acc1','월별');
   if(items.length) {
     const tCntM=items.reduce((s,it)=>s+it.cnt,0);
