@@ -1455,7 +1455,8 @@ document.addEventListener('keydown', e=>{ if(e.key==='Escape') hideModal(); });
 // ── 데이터 입력 ──────────────────────────────────────────
 const NEW_RECORDS = [];
 
-const SYNC_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbyM6GxfYzyIBqLd3zPiPLfXBUtJ3xHJ9vHwhKUksHwTlt7D7MNJfWypKpji0J0Cwenq/exec'; // Paste the Google Apps Script web app URL here.
+const SYNC_WEB_APP_URL = 'https://script.google.com/a/macros/fursys.com/s/AKfycbyM6GxfYzyIBqLd3zPiPLfXBUtJ3xHJ9vHwhKUksHwTlt7D7MNJfWypKpji0J0Cwenq/exec';
+const SYNC_FALLBACK_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbyM6GxfYzyIBqLd3zPiPLfXBUtJ3xHJ9vHwhKUksHwTlt7D7MNJfWypKpji0J0Cwenq/exec';
 const SYNC_POLL_MS = 5000;
 let _syncReady = false;
 let _syncBusy = false;
@@ -1470,7 +1471,7 @@ function setSyncStatus(text, mode='') {
   if(label) label.textContent = text;
   if(chip) {
     chip.className = 'sync-chip' + (mode ? ' ' + mode : '');
-    chip.title = mode === 'error' ? 'Google 시트 연결을 확인해주세요. 클릭하면 연동 페이지를 엽니다.' : 'Google Sheets 동기화 상태';
+    chip.title = mode === 'error' ? 'Google 시트 연결을 확인해주세요. 클릭하면 회사 계정 연동 페이지를 엽니다.' : 'Google Sheets 동기화 상태';
     chip.onclick = mode === 'error' ? openSyncAuth : null;
     chip.style.cursor = mode === 'error' ? 'pointer' : '';
   }
@@ -1480,11 +1481,16 @@ function setSyncStatus(text, mode='') {
 function syncUrl() {
   return (SYNC_WEB_APP_URL || '').trim();
 }
+function syncUrls() {
+  return [SYNC_WEB_APP_URL, SYNC_FALLBACK_WEB_APP_URL]
+    .map(url => (url || '').trim())
+    .filter((url, index, urls) => url && urls.indexOf(url) === index);
+}
 
 function openSyncAuth() {
   const url = syncUrl();
   if(!url) return;
-  showToast('새 탭에서 Google 시트 연동용 대시보드를 엽습니다. 회사 계정 로그인 후 사용하세요.');
+  showToast('\uC0C8 \uD0ED\uC5D0\uC11C \uD68C\uC0AC \uACC4\uC815\uC6A9 Google \uC2DC\uD2B8 \uC5F0\uB3D9 \uB300\uC2DC\uBCF4\uB4DC\uB97C \uC5FD\uB2C8\uB2E4. \uB85C\uADF8\uC778 \uD6C4 \uB2E4\uC2DC \uC0C8\uB85C\uACE0\uCE68\uD558\uC138\uC694.');
   window.open(url, '_blank', 'noopener');
 }
 
@@ -1495,9 +1501,7 @@ async function syncRequest(action, payload) {
     return syncAppsScriptRun(action, payload);
   }
   if(payload === undefined) {
-    return action === 'read'
-      ? syncBridgeRead().catch(() => syncJsonp(action))
-      : syncJsonp(action);
+    return action === 'read' ? syncReadWithFallback(action) : syncJsonp(action, url);
   }
   const body = JSON.stringify({action, ...payload});
   await fetch(url, {
@@ -1508,6 +1512,23 @@ async function syncRequest(action, payload) {
     body
   });
   return {ok:true, opaque:true};
+}
+
+async function syncReadWithFallback(action) {
+  let lastError = null;
+  for(const url of syncUrls()) {
+    try {
+      return await syncBridgeRead(url);
+    } catch(err) {
+      lastError = err;
+    }
+    try {
+      return await syncJsonp(action, url);
+    } catch(err) {
+      lastError = err;
+    }
+  }
+  throw lastError || new Error('\u0047\u006f\u006f\u0067\u006c\u0065 \uC2DC\uD2B8 \uB3D9\uAE30\uD654\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4');
 }
 
 function syncAppsScriptRun(action, payload) {
@@ -1522,15 +1543,15 @@ function syncAppsScriptRun(action, payload) {
     }
   });
 }
-function syncBridgeRead() {
+function syncBridgeRead(url=syncUrl()) {
   return new Promise((resolve, reject) => {
     const requestId = 'syncBridge_' + Date.now() + '_' + Math.random().toString(36).slice(2);
     const iframe = document.createElement('iframe');
     iframe.style.display = 'none';
-    const sep = syncUrl().includes('?') ? '&' : '?';
+    const sep = url.includes('?') ? '&' : '?';
     const timer = setTimeout(() => {
       cleanup();
-      reject(new Error('Google 시트 브리지 응답 시간이 초과되었습니다'));
+      reject(new Error('\u0047\u006f\u006f\u0067\u006c\u0065 \uC2DC\uD2B8 \uBE0C\uB9AC\uC9C0 \uC751\uB2F5 \uC2DC\uAC04\uC774 \uCD08\uACFC\uB418\uC5C8\uC2B5\uB2C8\uB2E4'));
     }, 30000);
     function cleanup() {
       clearTimeout(timer);
@@ -1545,18 +1566,18 @@ function syncBridgeRead() {
       else resolve(data.payload || {});
     }
     window.addEventListener('message', onMessage);
-    iframe.src = syncUrl() + sep + 'action=bridge&requestId=' + encodeURIComponent(requestId) + '&t=' + Date.now();
+    iframe.src = url + sep + 'action=bridge&requestId=' + encodeURIComponent(requestId) + '&t=' + Date.now();
     document.body.appendChild(iframe);
   });
 }
-function syncJsonp(action) {
+function syncJsonp(action, url=syncUrl()) {
   return new Promise((resolve, reject) => {
     const callback = '__syncCallback_' + Date.now() + '_' + Math.random().toString(36).slice(2);
     const script = document.createElement('script');
-    const sep = syncUrl().includes('?') ? '&' : '?';
+    const sep = url.includes('?') ? '&' : '?';
     const timer = setTimeout(() => {
       cleanup();
-      reject(new Error('Google 시트 응답 시간이 초과되었습니다'));
+      reject(new Error('\u0047\u006f\u006f\u0067\u006c\u0065 \uC2DC\uD2B8 \uC751\uB2F5 \uC2DC\uAC04\uC774 \uCD08\uACFC\uB418\uC5C8\uC2B5\uB2C8\uB2E4'));
     }, 30000);
     function cleanup() {
       clearTimeout(timer);
@@ -1569,13 +1590,12 @@ function syncJsonp(action) {
     };
     script.onerror = () => {
       cleanup();
-      reject(new Error('Google 동기화 앱을 불러올 수 없습니다'));
+      reject(new Error('\u0047\u006f\u006f\u0067\u006c\u0065 \uB3D9\uAE30\uD654 \uC571\uC744 \uBD88\uB7EC\uC62C \uC218 \uC5C6\uC2B5\uB2C8\uB2E4'));
     };
-    script.src = syncUrl() + sep + 'action=' + encodeURIComponent(action) + '&callback=' + encodeURIComponent(callback) + '&t=' + Date.now();
+    script.src = url + sep + 'action=' + encodeURIComponent(action) + '&callback=' + encodeURIComponent(callback) + '&t=' + Date.now();
     document.head.appendChild(script);
   });
 }
-
 
 function recordSyncId(r) {
   return [r['문서번호'] || '', r['순번'] || '1'].join('_');
