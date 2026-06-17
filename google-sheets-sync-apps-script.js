@@ -13,6 +13,12 @@ function doGet(e) {
       .setTitle('공정부적합 대시보드')
       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
   }
+  if (action === 'repairLossTotal') {
+    return jsonOutput(
+      repairRecordsTotalForDate(e.parameter.date || '2026-06-15', Number(e.parameter.amount || 1679415)),
+      e.parameter.callback
+    );
+  }
   if (action !== 'read') {
     return jsonOutput({ok: false, error: 'Unsupported action: ' + action}, e.parameter.callback);
   }
@@ -168,6 +174,61 @@ function existingSettingMap(sheet) {
     if (row[0]) acc[row[0]] = index + 2;
     return acc;
   }, {});
+}
+
+function repairRecordsTotalForDate(dateText, targetAmount) {
+  const sheet = getSheet(SHEETS.records);
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return {ok: false, error: 'No records'};
+
+  const range = sheet.getRange(2, 1, lastRow - 1, 4);
+  const rows = range.getValues();
+  const matches = [];
+  let currentTotal = 0;
+
+  rows.forEach((row, index) => {
+    if (!row[0] || !row[1]) return;
+    const item = JSON.parse(row[1]);
+    if (item['발생일'] !== dateText) return;
+    const amount = Math.round(Number(item['금액']) || 0);
+    matches.push({index, item, amount});
+    currentTotal += amount;
+  });
+
+  if (!matches.length) return {ok: false, error: 'No records for ' + dateText};
+  if (!currentTotal) return {ok: false, error: 'Current total is zero'};
+
+  const target = Math.round(Number(targetAmount) || 0);
+  const scaled = matches.map(match => {
+    const exact = match.amount * target / currentTotal;
+    return {...match, next: Math.floor(exact), remainder: exact - Math.floor(exact)};
+  });
+  let remainder = target - scaled.reduce((sum, match) => sum + match.next, 0);
+  scaled.sort((a, b) => b.remainder - a.remainder);
+  scaled.forEach(match => {
+    if (remainder > 0) {
+      match.next++;
+      remainder--;
+    }
+  });
+
+  const now = new Date().toISOString();
+  scaled.forEach(match => {
+    match.item['금액'] = match.next;
+    rows[match.index][1] = JSON.stringify(match.item);
+    rows[match.index][2] = now;
+    rows[match.index][3] = 'dashboard-repair';
+  });
+  range.setValues(rows);
+
+  return {
+    ok: true,
+    date: dateText,
+    records: matches.length,
+    previousTotal: currentTotal,
+    targetTotal: target,
+    savedTotal: scaled.reduce((sum, match) => sum + match.next, 0),
+  };
 }
 
 function jsonOutput(payload, callback) {
