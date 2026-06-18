@@ -1458,7 +1458,7 @@ function drawWeekly() {
       const dt = new Date(parseInt(year, 10), monthNum - 1, day);
       if(dt.getMonth() !== monthNum - 1) break;
       if(dt.getDay() !== 3) continue;
-      const wk = weekKey(dt);
+      const wk = weekKeyJS(year + '-' + String(monthNum).padStart(2,'0') + '-' + String(day).padStart(2,'0'));
       if(!monthWeeks.includes(wk)) monthWeeks.push(wk);
     }
     keys = monthWeeks.slice(0, 5);
