@@ -1442,30 +1442,34 @@ function initWeekSelectors() {
   sm.value = curM;
 }
 function onWeekFilter() { drawWeekly(); }
+function monthWeekKeys(year, month) {
+  if(!year || !month) return [];
+  const keys = [];
+  const monthNum = parseInt(month, 10);
+  const yearNum = parseInt(year, 10);
+  for(let day=1; day<=31; day++) {
+    const dt = new Date(yearNum, monthNum - 1, day);
+    if(dt.getMonth() !== monthNum - 1) break;
+    const dow = dt.getDay();
+    if(dow === 0 || dow === 6) continue;
+    const wk = weekKeyJS(year + '-' + String(monthNum).padStart(2,'0') + '-' + String(day).padStart(2,'0'));
+    if(!keys.includes(wk)) keys.push(wk);
+  }
+  return keys.slice(0, 5);
+}
 function drawWeekly() {
   const year  = document.getElementById('sel-week-year').value;
   const month = document.getElementById('sel-week-month').value;
+  const allowedMonthWeeks = new Set(monthWeekKeys(year, month));
   const realKeys = Object.keys(WEEKLY_ALL).filter(k=>{
     const y=parseInt(k); if(!(y>=2000&&y<=2027)) return false;
     if(year && !k.startsWith(year)) return false;
-    if(month) {
-      const wed = wedDateOfWeek(k);
-      if(String(wed.getMonth()+1).padStart(2,'0') !== month) return false;
-    }
+    if(month && allowedMonthWeeks.size && !allowedMonthWeeks.has(k)) return false;
     return true;
   }).sort();
   let keys = realKeys;
   if(year && month) {
-    const monthWeeks = [];
-    const monthNum = parseInt(month, 10);
-    for(let day=1; day<=31; day++) {
-      const dt = new Date(parseInt(year, 10), monthNum - 1, day);
-      if(dt.getMonth() !== monthNum - 1) break;
-      if(dt.getDay() !== 3) continue;
-      const wk = weekKeyJS(year + '-' + String(monthNum).padStart(2,'0') + '-' + String(day).padStart(2,'0'));
-      if(!monthWeeks.includes(wk)) monthWeeks.push(wk);
-    }
-    keys = monthWeeks.slice(0, 5);
+    keys = Array.from(allowedMonthWeeks);
     while(keys.length < 5) keys.push('__empty_week_' + (keys.length + 1));
   }
   const emptyWeek = k => ({key:k,lbl:k,cnt:0,qty:0,amt:0,cause:'-',reason:'-',dec:'-',discard:0,rework:0,byType:{}});
@@ -1802,7 +1806,15 @@ function syncJsonp(action, url=syncUrl()) {
 }
 
 function recordSyncId(r) {
-  return [r['문서번호'] || '', r['순번'] || '1'].join('_');
+  const doc = r['문서번호'] || '';
+  const seq = r['순번'] || '1';
+  if(doc) return [doc, seq].join('_');
+  return [
+    r['발생일'] || '',
+    r['공정부적합명'] || r['품목명'] || '',
+    r['부적합수량'] || '',
+    r['금액'] || ''
+  ].join('_');
 }
 
 function normalizeRemoteRecords(records) {
@@ -1825,11 +1837,14 @@ function comparableRecord(record) {
 function mergeRemoteRecords(records) {
   const incoming = normalizeRemoteRecords(records);
   if(!incoming.length) return 0;
-  const localOnly = RAW_DATA.filter(record => record && record._new && !record._synced);
-  const before = comparableRecord({records: RAW_DATA.filter(record => record && record._synced)});
-  const after = comparableRecord({records: incoming});
+  const before = comparableRecord({records: RAW_DATA});
+  const merged = new Map();
+  RAW_DATA.filter(Boolean).forEach(record => merged.set(recordSyncId(record), record));
+  incoming.forEach(record => merged.set(recordSyncId(record), record));
+  const afterRecords = Array.from(merged.values());
+  const after = comparableRecord({records: afterRecords});
   RAW_DATA.length = 0;
-  RAW_DATA.push(...incoming, ...localOnly);
+  RAW_DATA.push(...afterRecords);
   reaggregate();
   return before === after ? 0 : incoming.length;
 }
