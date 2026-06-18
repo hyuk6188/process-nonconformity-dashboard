@@ -572,7 +572,7 @@
   </div>
   <div class="exec-charts-row">
     <div class="exec-card">
-      <div class="exec-clbl" id="lbl-daily-cnt">일별 발생 건수</div>
+      <div class="exec-clbl" id="lbl-daily-cnt">일별 발생 수량</div>
       <div class="exec-chart-wrap"><canvas id="ch-daily"></canvas></div>
     </div>
     <div class="exec-card">
@@ -605,7 +605,7 @@
   </div>
   <div class="exec-charts-row">
     <div class="exec-card">
-      <div class="exec-clbl" id="lbl-weekly-cnt">주별 발생 건수</div>
+      <div class="exec-clbl" id="lbl-weekly-cnt">주별 발생 수량</div>
       <div class="exec-chart-wrap"><canvas id="ch-weekly"></canvas></div>
     </div>
     <div class="exec-card">
@@ -633,7 +633,7 @@
   </div>
   <div class="exec-charts-row">
     <div class="exec-card">
-      <div class="exec-clbl" id="lbl-monthly-cnt">월별 발생 건수</div>
+      <div class="exec-clbl" id="lbl-monthly-cnt">월별 발생 수량</div>
       <div class="exec-chart-wrap"><canvas id="ch-monthly-tab"></canvas></div>
     </div>
     <div class="exec-card">
@@ -654,7 +654,7 @@
   </div>
   <div class="exec-charts-row">
     <div class="exec-card">
-      <div class="exec-clbl">연도별 발생 건수</div>
+      <div class="exec-clbl">&#50672;&#46020;&#48324; &#48156;&#49373; &#49688;&#47049;</div>
       <div class="exec-chart-wrap"><canvas id="ch-yearly-cnt"></canvas></div>
     </div>
     <div class="exec-card">
@@ -1126,7 +1126,7 @@ function makeChart(id, type, labels, data, color, isAmt, items, periodType, onBa
   try {
   _charts[id] = new Chart(document.getElementById(id), {
     type, data:{labels, datasets:[{
-      label: isAmt?'손실금액':'건수', data,
+      label: isAmt?'손실금액':'수량', data,
       backgroundColor: type==='line'? color.replace(')',',0.1)').replace('rgb','rgba') : color,
       borderColor: type==='line'? color : undefined,
       fill: type==='line', tension:.35, pointRadius: type==='line'?4:0,
@@ -1208,8 +1208,8 @@ function makePeriodDetailClick(detailId, allItems, color, periodLabel, chartId, 
     if(infoId) {
       const info = document.getElementById(infoId);
       if(info) info.textContent = reset
-        ? allItems.length + '개 ? 합계 ' + totalQty().toLocaleString() + 'ea'
-        : (it.lbl || it.key) + ' ? ' + (it.qty || 0).toLocaleString() + 'ea 선택됨';
+        ? allItems.length + '개 · 합계 ' + totalQty().toLocaleString() + 'ea'
+        : (it.lbl || it.key) + ' · ' + (it.qty || 0).toLocaleString() + 'ea 선택됨';
     }
     const chart = _charts[chartId];
     if(chart && chart.data && chart.data.datasets && chart.data.datasets[0]) {
@@ -1471,12 +1471,12 @@ function drawWeekly() {
   const emptyWeek = k => ({key:k,lbl:k,cnt:0,qty:0,amt:0,cause:'-',reason:'-',dec:'-',discard:0,rework:0,byType:{}});
   const chartItems = keys.map(k=>({key:k,...(WEEKLY_ALL[k] || emptyWeek(k))}));
   const items= realKeys.map(k=>({key:k,...WEEKLY_ALL[k]}));
-  const cnts = chartItems.map(it=>it.cnt || 0);
+  const cnts = chartItems.map(it=>it.qty || 0);
   const amts = chartItems.map(it=>it.amt || 0);
   const lbl  = (year||'전체')+(month?` ${parseInt(month)}월`:'')+' 주별';
-  document.getElementById('lbl-weekly-cnt').textContent=lbl+' 발생 건수';
+  document.getElementById('lbl-weekly-cnt').textContent=lbl+' 발생 수량';
   document.getElementById('lbl-weekly-amt').textContent=lbl+' 손실금액';
-  document.getElementById('week-filter-info').textContent=`${items.length}주 · 합계 ${items.reduce((s,it)=>s+it.cnt,0).toLocaleString()}건`;
+  document.getElementById('week-filter-info').textContent=`${items.length}\uC8FC \u00B7 \uD569\uACC4 ${items.reduce((s,it)=>s+it.qty,0).toLocaleString()}ea`;
   // "YYYY-Www" → 월 선택 시 "N주", 년도만 선택 시 "M월 N주"
   const wLbl = k => {
     if(String(k).startsWith('__empty_week_')) return String(k).replace('__empty_week_', '') + '\uC8FC';
@@ -1530,12 +1530,12 @@ function drawMonthly() {
     : keys;
   const emptyMonth = k => ({key:k,lbl:k,cnt:0,qty:0,amt:0,cause:'-',reason:'-',dec:'-',discard:0,rework:0,byType:{},_empty:true});
   const chartItems = chartKeys.map(k => itemByKey[k] || emptyMonth(k));
-  const cnts = chartItems.map(it => it._empty ? null : it.cnt);
+  const cnts = chartItems.map(it => it._empty ? null : it.qty);
   const amts = chartItems.map(it => it._empty ? null : it.amt);
   const lbl  = year?year+'년 월별':'전체 월별';
-  document.getElementById('lbl-monthly-cnt').textContent=lbl+' 발생 건수';
+  document.getElementById('lbl-monthly-cnt').textContent=lbl+' 발생 수량';
   document.getElementById('lbl-monthly-amt').textContent=lbl+' 손실금액';
-  document.getElementById('month-filter-info').textContent=`${items.length}개월 · 합계 ${items.reduce((s,it)=>s+it.cnt,0).toLocaleString()}건`;
+  document.getElementById('month-filter-info').textContent=`${items.length}\uAC1C\uC6D4 \u00B7 \uD569\uACC4 ${items.reduce((s,it)=>s+it.qty,0).toLocaleString()}ea`;
   const mLbl = k => year ? parseInt(k.slice(5))+'월' : k.replace('-','년 ')+'월';
   const updateMonthlyChartHighlight = (selectedIdx) => {
     const chart = _charts['ch-monthly-tab'];
@@ -1555,7 +1555,7 @@ function drawMonthly() {
     renderPeriodTable('detail-monthly', reset ? items : [it], '#00acc1', '월별');
     const info = document.getElementById('month-filter-info');
     if(info) info.textContent = reset
-      ? `${items.length}개월 · 합계 ${items.reduce((s,item)=>s+item.cnt,0).toLocaleString()}건`
+      ? `${items.length}\uAC1C\uC6D4 \u00B7 \uD569\uACC4 ${items.reduce((s,item)=>s+item.qty,0).toLocaleString()}ea`
       : `${mLbl(it.key)} · ${(it.qty || 0).toLocaleString()}ea 선택됨`;
     updateMonthlyChartHighlight(selectedMonthIdx);
   };
@@ -1589,7 +1589,7 @@ function drawYearly() {
   const emptyYear = k => ({key:k,lbl:k+'년',cnt:0,qty:0,amt:0,cause:'-',reason:'-',dec:'-',discard:0,rework:0,byType:{},_empty:true});
   const chartItems = keys.map(k=>({key:k,...(YEARLY_ALL[k] || emptyYear(k))}));
   const items = chartItems.filter(it=>!it._empty);
-  const yCnt = chartItems.map(it=>it._empty ? null : it.cnt);
+  const yCnt = chartItems.map(it=>it._empty ? null : it.qty);
   const yAmt = chartItems.map(it=>it._empty ? null : it.amt);
   const yLbl = chartItems.map(it=>it.lbl || (it.key + '년'));
   const updateYearlyChartHighlight = (selectedIdx) => {
