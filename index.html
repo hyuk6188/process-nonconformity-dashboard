@@ -1441,7 +1441,7 @@ function onWeekFilter() { drawWeekly(); }
 function drawWeekly() {
   const year  = document.getElementById('sel-week-year').value;
   const month = document.getElementById('sel-week-month').value;
-  const keys = Object.keys(WEEKLY_ALL).filter(k=>{
+  const realKeys = Object.keys(WEEKLY_ALL).filter(k=>{
     const y=parseInt(k); if(!(y>=2000&&y<=2027)) return false;
     if(year && !k.startsWith(year)) return false;
     if(month) {
@@ -1450,15 +1450,32 @@ function drawWeekly() {
     }
     return true;
   }).sort();
-  const items= keys.map(k=>({key:k,...WEEKLY_ALL[k]}));
-  const cnts = keys.map(k=>WEEKLY_ALL[k].cnt);
-  const amts = keys.map(k=>WEEKLY_ALL[k].amt);
+  let keys = realKeys;
+  if(year && month) {
+    const monthWeeks = [];
+    const monthNum = parseInt(month, 10);
+    for(let day=1; day<=31; day++) {
+      const dt = new Date(parseInt(year, 10), monthNum - 1, day);
+      if(dt.getMonth() !== monthNum - 1) break;
+      if(dt.getDay() !== 3) continue;
+      const wk = weekKey(dt);
+      if(!monthWeeks.includes(wk)) monthWeeks.push(wk);
+    }
+    keys = monthWeeks.slice(0, 5);
+    while(keys.length < 5) keys.push('__empty_week_' + (keys.length + 1));
+  }
+  const emptyWeek = k => ({key:k,lbl:k,cnt:0,qty:0,amt:0,cause:'-',reason:'-',dec:'-',discard:0,rework:0,byType:{}});
+  const chartItems = keys.map(k=>({key:k,...(WEEKLY_ALL[k] || emptyWeek(k))}));
+  const items= realKeys.map(k=>({key:k,...WEEKLY_ALL[k]}));
+  const cnts = chartItems.map(it=>it.cnt || 0);
+  const amts = chartItems.map(it=>it.amt || 0);
   const lbl  = (year||'전체')+(month?` ${parseInt(month)}월`:'')+' 주별';
   document.getElementById('lbl-weekly-cnt').textContent=lbl+' 발생 건수';
   document.getElementById('lbl-weekly-amt').textContent=lbl+' 손실금액';
   document.getElementById('week-filter-info').textContent=`${items.length}주 · 합계 ${items.reduce((s,it)=>s+it.cnt,0).toLocaleString()}건`;
   // "YYYY-Www" → 월 선택 시 "N주", 년도만 선택 시 "M월 N주"
   const wLbl = k => {
+    if(String(k).startsWith('__empty_week_')) return String(k).replace('__empty_week_', '') + '\uC8FC';
     const wed = wedDateOfWeek(k);
     const mo = wed.getMonth() + 1;
     const firstDow = (new Date(wed.getFullYear(), wed.getMonth(), 1).getDay() + 6) % 7;
@@ -1467,9 +1484,10 @@ function drawWeekly() {
     return month ? `${wn}주` : `${mo}월 ${wn}주`;
   };
   // lbl 필드를 포맷된 라벨로 교체 (테이블·KPI에서 "YYYY-Www" 대신 표시)
-  items.forEach((it, i) => { it.lbl = wLbl(keys[i]); });
-  makeChart('ch-weekly','bar',keys.map(wLbl),cnts,'rgba(26,86,219,0.72)',false,items,'주별',makePeriodDetailClick('detail-weekly',items,'#8e24aa','주별','ch-weekly','week-filter-info'));
-  makeChart('ch-weekly-amt','line',keys.map(wLbl),amts,'rgb(194,65,12)',true,items,'주별');
+  items.forEach((it, i) => { it.lbl = wLbl(realKeys[i]); });
+  chartItems.forEach((it, i) => { it.lbl = wLbl(keys[i]); });
+  makeChartSafe('ch-weekly','bar',keys.map(wLbl),cnts,'rgba(26,86,219,0.72)',false,chartItems,'\uC8FC\uBCC4',makePeriodDetailClick('detail-weekly',items,'#8e24aa','\uC8FC\uBCC4','ch-weekly','week-filter-info'));
+  makeChartSafe('ch-weekly-amt','line',keys.map(wLbl),amts,'rgb(194,65,12)',true,chartItems,'\uC8FC\uBCC4');
   renderPeriodTable('detail-weekly',items,'#8e24aa','주별');
   if(items.length) {
     const tCntW=items.reduce((s,it)=>s+it.cnt,0);
