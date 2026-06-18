@@ -1640,11 +1640,17 @@ function initYearSelectors() {
   const years = dataYearsFromKeys(YEARLY_ALL);
   const prev = sy.value;
   sy.innerHTML = '';
-  years.forEach(y=>{ const o=document.createElement('option'); o.value=y; o.textContent=y+'년'; sy.appendChild(o); });
-  const curY = String(new Date().getFullYear());
-  if(prev && years.includes(prev)) sy.value = prev;
-  else if(years.includes(curY)) sy.value = curY;
-  else if(years.length) sy.value = years[years.length - 1];
+  const recent = document.createElement('option');
+  recent.value = '';
+  recent.textContent = '최근 5년';
+  sy.appendChild(recent);
+  years.slice().reverse().forEach(y=>{
+    const o=document.createElement('option');
+    o.value=y;
+    o.textContent=y+'년까지';
+    sy.appendChild(o);
+  });
+  sy.value = prev && years.includes(prev) ? prev : '';
 }
 function onYearFilter() { drawYearly(); }
 function drawYearly() {
