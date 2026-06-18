@@ -769,7 +769,7 @@ function amtFmt(value) {
 
 function amtAxisFmt(value) {
   const n = Number(value) || 0;
-  return Math.round(n / 10000).toLocaleString() + '\uB9CC\uC6D0';
+  return Math.round(n / 1000000).toLocaleString() + '\uBC31\uB9CC\uC6D0';
 }
 
 function escapeHtml(value) {
