@@ -924,7 +924,7 @@ function renderPeriodTable(wrapId, items, color, period) {
       html += `<div class="sub-row" style="cursor:pointer" title="더블클릭으로 상세보기" ondblclick="showEquipModal(this)">
         <span class="sub-num">${j+1}</span>
         <span class="sub-name">${icon}<strong>${n}</strong></span>
-        <span style="font-size:12px;color:var(--text-2);min-width:50px;text-align:right">${nv.qty||0}ea</span>
+        <span style="font-size:12px;color:var(--text-2);min-width:50px;text-align:right">${(nv.qty||0).toLocaleString()}ea</span>
         <span class="sub-amt">${nv.amt.toLocaleString()}원</span>
         <span class="sub-arr" data-eq='${edata.replace(/'/g,"&apos;")}'></span>
       </div>`;
@@ -1038,7 +1038,7 @@ function showEquipModal(rowEl) {
   const kindLabel = d.isColor ? '색상' : '설비명';
   const filterKey = d.isColor ? '색상' : '설비명';
   document.getElementById('equip-modal-title').innerHTML =
-    `${icon} <strong>${d.name}</strong> <span style="font-size:12px;font-weight:400;color:var(--text-2);margin-left:6px">[${d.typeNm}] ${d.cnt}건 · ${d.qty}ea · ${d.amt.toLocaleString()}원</span>`;
+    `${icon} <strong>${d.name}</strong> <span style="font-size:12px;font-weight:400;color:var(--text-2);margin-left:6px">[${d.typeNm}] ${d.cnt}건 · ${(d.qty||0).toLocaleString()}ea · ${d.amt.toLocaleString()}원</span>`;
 
   const itemRows = buildEquipModalItemRows(d.items);
   if (itemRows.length) {
@@ -1844,7 +1844,7 @@ function showPeriodModal(period, label, color, cnt, qty, amt, cause, reason, dec
         <span style="width:18px;height:18px;border-radius:50%;background:${c};display:flex;align-items:center;justify-content:center;color:#fff;font-size:10px;font-weight:700;flex-shrink:0">${i+1}</span>
         <span style="flex:1;font-size:13px;font-weight:500">${t}</span>
         <span style="font-size:12px;color:var(--text-2)">${tv.cnt}</span>
-        <span style="font-size:12px;color:var(--text-2);width:70px;text-align:right">${tv.qty}ea</span>
+        <span style="font-size:12px;color:var(--text-2);width:70px;text-align:right">${(tv.qty||0).toLocaleString()}ea</span>
         <span style="font-size:12px;color:var(--text-2);width:90px;text-align:right">${amtFmt(tv.amt)}</span>
       </div>`;
     });
