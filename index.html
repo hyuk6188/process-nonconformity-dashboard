@@ -1577,13 +1577,37 @@ function drawMonthly() {
 
 // ── 연별 탭 ──────────────────────────────────────────────
 function drawYearly() {
-  const keys = Object.keys(YEARLY_ALL).filter(k=>{const y=parseInt(k);return y>=2000&&y<=2027;}).sort();
-  const items= keys.map(k=>({key:k,...YEARLY_ALL[k]}));
-  const yCnt = keys.map(k=>YEARLY_ALL[k].cnt);
-  const yAmt = keys.map(k=>YEARLY_ALL[k].amt);
-  const yLbl = keys.map(k=>YEARLY_ALL[k].lbl);
-  makeChart('ch-yearly-cnt','bar',yLbl,yCnt,'rgba(26,86,219,0.72)',false,items,'연별',makePeriodDetailClick('detail-yearly',items,'#1e88e5','연별','ch-yearly-cnt'));
-  makeChart('ch-yearly-amt','line',yLbl,yAmt,'rgb(194,65,12)',true,items,'연별');
+  const realKeys = Object.keys(YEARLY_ALL).filter(k=>{const y=parseInt(k);return y>=2000&&y<=2027;}).sort();
+  const latestDataYear = realKeys.length ? Math.max(...realKeys.map(k => parseInt(k, 10))) : new Date().getFullYear();
+  const latestYear = Math.max(latestDataYear, new Date().getFullYear());
+  const keys = Array.from({length:5}, (_, i) => String(latestYear - 4 + i));
+  const emptyYear = k => ({key:k,lbl:k+'년',cnt:0,qty:0,amt:0,cause:'-',reason:'-',dec:'-',discard:0,rework:0,byType:{},_empty:true});
+  const chartItems = keys.map(k=>({key:k,...(YEARLY_ALL[k] || emptyYear(k))}));
+  const items = chartItems.filter(it=>!it._empty);
+  const yCnt = chartItems.map(it=>it._empty ? null : it.cnt);
+  const yAmt = chartItems.map(it=>it._empty ? null : it.amt);
+  const yLbl = chartItems.map(it=>it.lbl || (it.key + '년'));
+  const updateYearlyChartHighlight = (selectedIdx) => {
+    const chart = _charts['ch-yearly-cnt'];
+    if(chart && chart.data && chart.data.datasets && chart.data.datasets[0]) {
+      chart.data.datasets[0].backgroundColor = chartItems.map((entry, i) => {
+        if(entry._empty) return 'rgba(26,86,219,0.08)';
+        return selectedIdx === null ? 'rgba(26,86,219,0.72)' : (i === selectedIdx ? 'rgba(26,86,219,1)' : 'rgba(26,86,219,0.28)');
+      });
+      chart.update();
+    }
+  };
+  let selectedYearIdx = null;
+  const yearlyClick = (it, idx) => {
+    if(!it || it._empty) return;
+    const reset = selectedYearIdx === idx;
+    selectedYearIdx = reset ? null : idx;
+    renderPeriodTable('detail-yearly', reset ? items : [it], '#1e88e5', '연별');
+    updateYearlyChartHighlight(selectedYearIdx);
+  };
+  makeChart('ch-yearly-cnt','bar',yLbl,yCnt,'rgba(26,86,219,0.72)',false,chartItems,'연별',yearlyClick);
+  updateYearlyChartHighlight(null);
+  makeChart('ch-yearly-amt','line',yLbl,yAmt,'rgb(194,65,12)',true,chartItems,'연별',yearlyClick);
   renderPeriodTable('detail-yearly',items,'#1e88e5','연별');
   if(items.length) {
     const tCntY=items.reduce((s,it)=>s+it.cnt,0);
