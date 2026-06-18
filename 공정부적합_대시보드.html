@@ -174,22 +174,32 @@
   .al-filters select{min-width:110px}
   .al-reset{background:var(--surface-2);color:var(--text-2);border:0.5px solid var(--border);border-radius:7px;padding:8px 14px;font-size:14px;cursor:pointer}
   .al-reset:hover{background:var(--border)}
-  .al-table{width:100%;border-collapse:collapse;font-size:14px}
+  .al-table{width:100%;border-collapse:collapse;table-layout:fixed;font-size:14px}
   .al-table thead tr{background:var(--surface-2)}
-  .al-table thead th{padding:10px 12px;text-align:left;color:var(--text-2);font-weight:700;white-space:nowrap;border-bottom:0.5px solid var(--border)}
-  .al-table tbody tr{border-bottom:0.5px solid var(--border)}
+  .al-table thead th{height:38px;padding:0 12px;text-align:left;color:var(--text-2);font-weight:700;white-space:nowrap;border-bottom:0.5px solid var(--border);vertical-align:middle;box-sizing:border-box}
+  .al-table tbody tr{border-bottom:0.5px solid var(--border);height:54px}
   .al-table tbody tr:hover{background:var(--surface-2)}
-  .al-table td{padding:10px 12px;vertical-align:middle;color:var(--text)}
-  .al-table th:nth-child(8),.al-table td:nth-child(8){min-width:118px;padding-right:24px}
-  .al-table th:nth-child(9),.al-table td:nth-child(9){min-width:88px;padding-left:20px}
-  .al-badge{display:inline-block;border-radius:50%;width:24px;height:24px;line-height:24px;text-align:center;font-size:12px;font-weight:700;color:#fff}
+  .al-table td{height:54px;padding:0 12px;vertical-align:middle;color:var(--text);box-sizing:border-box;line-height:1.35}
+  .al-table th:nth-child(1),.al-table td:nth-child(1){width:54px;text-align:left;color:#64748b}
+  .al-table th:nth-child(2),.al-table td:nth-child(2){width:100px}
+  .al-table th:nth-child(3),.al-table td:nth-child(3){width:190px}
+  .al-table th:nth-child(4),.al-table td:nth-child(4){width:210px}
+  .al-table th:nth-child(5),.al-table td:nth-child(5){width:210px}
+  .al-table th:nth-child(6),.al-table td:nth-child(6){width:92px;text-align:center}
+  .al-table th:nth-child(7),.al-table td:nth-child(7){width:110px}
+  .al-table th:nth-child(8),.al-table td:nth-child(8){width:132px;text-align:center}
+  .al-table th:nth-child(9),.al-table td:nth-child(9){width:112px;text-align:center}
+  .al-table th:nth-child(10),.al-table td:nth-child(10){width:132px;text-align:center}
+  .al-table th:nth-child(11),.al-table td:nth-child(11){width:48px;text-align:center}
+  .al-table td:nth-child(3),.al-table td:nth-child(4),.al-table td:nth-child(5){overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .al-badge{display:inline-flex;align-items:center;justify-content:center;border-radius:50%;width:24px;height:24px;line-height:1;text-align:center;font-size:12px;font-weight:700;color:#fff;vertical-align:middle}
   .al-badge.상{background:#e53935}.al-badge.중{background:#fb8c00}.al-badge.하{background:#90a4ae}
-  .al-date-btn{background:var(--surface-2);border:0.5px solid var(--border);border-radius:6px;color:var(--text-2);padding:6px 10px;font-size:13px;cursor:pointer;white-space:nowrap;display:inline-block}
+  .al-date-btn{height:32px;min-width:90px;background:var(--surface-2);border:0.5px solid var(--border);border-radius:6px;color:var(--text-2);padding:0 10px;font-size:13px;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;justify-content:center;vertical-align:middle;box-sizing:border-box}
   .al-date-btn.set{color:#1a56db;border-color:#1a56db}
-  .al-status{background:var(--surface-2);border:0.5px solid var(--border);border-radius:6px;color:var(--text);padding:6px 8px;font-size:13px}
-  .al-memo-btn{background:var(--surface-2);border:0.5px solid var(--border);border-radius:6px;color:var(--text-2);padding:6px 10px;font-size:13px;cursor:pointer}
+  .al-status{height:32px;min-width:76px;background:var(--surface-2);border:0.5px solid var(--border);border-radius:6px;color:var(--text);padding:0 8px;font-size:13px;vertical-align:middle;box-sizing:border-box}
+  .al-memo-btn{height:32px;min-width:78px;background:var(--surface-2);border:0.5px solid var(--border);border-radius:6px;color:var(--text-2);padding:0 10px;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;vertical-align:middle;box-sizing:border-box}
   .al-memo-btn.set{color:#f59e0b;border-color:#f59e0b}
-  .al-del-btn{background:none;border:none;color:var(--text-3);cursor:pointer;font-size:14px;padding:2px 6px}
+  .al-del-btn{width:28px;height:28px;background:none;border:none;color:var(--text-3);cursor:pointer;font-size:15px;padding:0;display:inline-flex;align-items:center;justify-content:center;vertical-align:middle}
   .al-del-btn:hover{color:#e53935}
 
   /* ── 점검항목 추가 모달 ── */
