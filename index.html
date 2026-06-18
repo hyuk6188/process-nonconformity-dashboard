@@ -694,8 +694,8 @@
   </div>
   <div class="al-kpis" id="al-kpis"></div>
   <div class="al-filters">
-    <input id="al-search" placeholder="전체 검색: 설비명, 점검사항, 증상, 담당자" oninput="alRender()">
-    <select id="al-f-equip" onchange="alRender()"><option value="">전체 설비명</option></select>
+    <input id="al-search" placeholder="전체 검색: 공정/설비명, 증상, 점검사항, 담당자" oninput="alRender()">
+    <select id="al-f-equip" onchange="alRender()"><option value="">전체 공정/설비명</option></select>
     <select id="al-f-cat" onchange="alRender()">
       <option value="">전체 구분</option>
       <option>엣지</option><option>보링</option><option>기타</option>
@@ -709,7 +709,7 @@
   </div>
   <table class="al-table">
     <thead><tr>
-      <th>No</th><th>구분</th><th>설비명</th><th>점검사항</th><th>증상</th>
+      <th>No</th><th>구분</th><th>공정/설비명</th><th>증상</th><th>점검사항</th>
       <th>중요도</th><th>담당자</th><th>일정</th><th>상태</th><th>비고</th><th></th>
     </tr></thead>
     <tbody id="al-tbody"></tbody>
@@ -733,9 +733,9 @@
     <h3>점검 항목 추가</h3>
     <div class="al-field"><label>구분</label>
       <select id="al-cat"><option>엣지</option><option>보링</option><option>기타</option></select></div>
-    <div class="al-field"><label>설비명</label><input id="al-equip" placeholder="설비명 입력"></div>
-    <div class="al-field"><label>점검사항</label><input id="al-check" placeholder="점검사항 입력"></div>
+    <div class="al-field"><label>공정/설비명</label><input id="al-equip" placeholder="공정/설비명 입력"></div>
     <div class="al-field"><label>증상</label><input id="al-symptom" placeholder="증상 입력"></div>
+    <div class="al-field"><label>점검사항</label><input id="al-check" placeholder="점검사항 입력"></div>
     <div class="al-field"><label>중요도</label>
       <select id="al-priority"><option>상</option><option>중</option><option>하</option></select></div>
     <div class="al-field"><label>담당자</label><input id="al-user" placeholder="담당자 입력"></div>
@@ -2538,12 +2538,12 @@ function alRender() {
     `<div class="al-kpi"><div class="al-kpi-val">${v}</div><div class="al-kpi-lbl">${k} 항목</div></div>`
   ).join('');
 
-  // 설비명/담당자 필터 옵션 갱신
+  // 공정/설비명/담당자 필터 옵션 갱신
   const equips = [...new Set(AL_ITEMS.map(i=>i.설비명).filter(Boolean))];
   const users  = [...new Set(AL_ITEMS.map(i=>i.담당자).filter(Boolean))];
   const se = document.getElementById('al-f-equip');
   const sv = se.value;
-  se.innerHTML = '<option value="">전체 설비명</option>' + equips.map(e=>`<option${e===sv?' selected':''}>${e}</option>`).join('');
+  se.innerHTML = '<option value="">전체 공정/설비명</option>' + equips.map(e=>`<option${e===sv?' selected':''}>${e}</option>`).join('');
   const su = document.getElementById('al-f-user');
   const suv = su.value;
   su.innerHTML = '<option value="">전체 담당자</option>' + users.map(u=>`<option${u===suv?' selected':''}>${u}</option>`).join('');
@@ -2569,8 +2569,8 @@ function alRender() {
       <td style="color:#64748b">${i+1}</td>
       <td>${it.구분||''}</td>
       <td style="font-weight:500">${it.설비명||''}</td>
-      <td>${it.점검사항||''}</td>
       <td style="color:#94a3b8">${it.증상||''}</td>
+      <td>${it.점검사항||''}</td>
       <td style="text-align:center">${badge}</td>
       <td>${it.담당자||''}</td>
       <td>${dateBtn}</td>
@@ -2595,7 +2595,7 @@ function alCloseAdd() { document.getElementById('al-modal').classList.remove('op
 function alSaveAdd() {
   const equip = document.getElementById('al-equip').value.trim();
   const check = document.getElementById('al-check').value.trim();
-  if(!equip||!check) { alert('설비명과 점검사항은 필수입니다.'); return; }
+  if(!equip||!check) { alert('공정/설비명과 점검사항은 필수입니다.'); return; }
   AL_ITEMS.push({
     id: Date.now().toString(),
     구분: document.getElementById('al-cat').value,
