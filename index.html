@@ -1325,6 +1325,18 @@ function selectDailyDate(dateText) {
   return true;
 }
 
+function selectWeeklyDate(dateText) {
+  if(!dateText) return false;
+  const y = dateText.slice(0,4);
+  const m = dateText.slice(5,7);
+  const sy = document.getElementById('sel-week-year');
+  const sm = document.getElementById('sel-week-month');
+  const hasYear = sy && Array.from(sy.options).some(o => o.value === y);
+  if(sy && hasYear) sy.value = y;
+  if(sm) sm.value = m;
+  return !!hasYear;
+}
+
 function initDaySelectors() {
   const sy = document.getElementById('sel-day-year');
   DAY_YEARS.forEach(y=>{ const o=document.createElement('option'); o.value=y; o.textContent=y+'년'; sy.appendChild(o); });
@@ -1504,18 +1516,17 @@ function initWeekSelectors() {
   const sy = document.getElementById('sel-week-year');
   if(!sy) return;
   const years = dataYearsFromKeys(WEEKLY_ALL);
-  const prev = sy.value;
   sy.innerHTML = '';
-  years.forEach(y=>{ const o=document.createElement('option'); o.value=y; o.textContent=y+'년'; sy.appendChild(o); });
-  // 기본값: 현재 년+월
+  years.forEach(y=>{ const o=document.createElement('option'); o.value=y; o.textContent=y+'\uB144'; sy.appendChild(o); });
+  const latestDate = latestRecordDate(RAW_DATA);
+  if(selectWeeklyDate(latestDate)) return;
   const now = new Date();
   const curY = String(now.getFullYear());
   const curM = String(now.getMonth()+1).padStart(2,'0');
-  if(prev && years.includes(prev)) sy.value = prev;
-  else if(years.includes(curY)) sy.value = curY;
+  if(years.includes(curY)) sy.value = curY;
   else if(years.length) sy.value = years[years.length - 1];
   const sm = document.getElementById('sel-week-month');
-  if(sm && !sm.value) sm.value = curM;
+  if(sm) sm.value = curM;
 }
 function onWeekFilter() { drawWeekly(); }
 function monthWeekKeys(year, month) {
@@ -2079,6 +2090,8 @@ function showToast(msg) {
 function refreshAfterDataChange(records=[]) {
   const latestDate = latestRecordDate(RAW_DATA);
   if(!selectDailyDate(latestDate)) initDayWeekSelector();
+  initWeekSelectors();
+  selectWeeklyDate(latestDate);
   ['daily','weekly','monthly','yearly'].forEach(id => { _drawn[id] = false; });
   const activeId = document.querySelector('.page.active')?.id?.replace('page-','') || 'daily';
   _drawn[activeId] = true;
