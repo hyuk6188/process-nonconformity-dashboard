@@ -1657,7 +1657,6 @@ document.addEventListener('keydown', e=>{ if(e.key==='Escape') hideModal(); });
 const NEW_RECORDS = [];
 
 const SYNC_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbyM6GxfYzyIBqLd3zPiPLfXBUtJ3xHJ9vHwhKUksHwTlt7D7MNJfWypKpji0J0Cwenq/exec';
-const SYNC_POLL_MS = 5000;
 let _syncReady = false;
 let _syncBusy = false;
 let _syncTimer = null;
@@ -1843,13 +1842,14 @@ async function syncPullNow(quiet=false) {
   if(!syncUrl()) { setSyncStatus('동기화 미설정'); return; }
   if(_syncBusy) return;
   _syncBusy = true;
-  setSyncStatus('시트 동기화 중', 'busy');
+  const wasSyncReady = _syncReady;
+  if(!quiet) setSyncStatus('시트 동기화 중', 'busy');
   try {
     const data = await syncRequest('read');
     if(data && data.ok === false) throw new Error(data.error || 'sync failed');
     applyRemoteState(data || {}, quiet);
     _syncReady = true;
-    setSyncStatus('동기화 완료', 'ready');
+    if(!quiet || !wasSyncReady) setSyncStatus('동기화 완료', 'ready');
   } catch(err) {
     const message = err && err.message ? err.message : '동기화 실패';
     const authLike = /권한|로그인|authorization|auth|permission/i.test(message);
@@ -1918,7 +1918,7 @@ async function initDashboardSync() {
   if(!syncUrl()) { setSyncStatus('??? ???'); return false; }
   await syncPullNow(true);
   clearInterval(_syncTimer);
-  _syncTimer = setInterval(() => syncPullNow(true), SYNC_POLL_MS);
+  _syncTimer = null;
   return true;
 }
 
