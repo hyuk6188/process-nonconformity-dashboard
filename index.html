@@ -767,14 +767,18 @@ function amtFmt(value) {
   return Math.round(n).toLocaleString() + '\uC6D0';
 }
 
-function amtAxisFmt(value) {
+function fmtMillionWon(value) {
   const n = Number(value) || 0;
-  return Math.round(n / 1000000).toLocaleString() + '\uBC31\uB9CC\uC6D0';
+  const million = Math.round((n / 1000000) * 10) / 10;
+  return Number.isInteger(million) ? million.toLocaleString() : million.toLocaleString(undefined, { maximumFractionDigits: 1 });
+}
+
+function amtAxisFmt(value) {
+  return fmtMillionWon(value) + '\uBC31\uB9CC\uC6D0';
 }
 
 function amtPointFmt(value) {
-  const n = Number(value) || 0;
-  return Math.round(n / 1000000).toLocaleString();
+  return fmtMillionWon(value);
 }
 
 function escapeHtml(value) {
