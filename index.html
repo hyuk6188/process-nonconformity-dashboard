@@ -873,10 +873,17 @@ function renderPeriodTable(wrapId, items, color, period) {
       typeMap[t].amt += tv.amt;
       if (tv.groupKey) typeMap[t].groupKey = tv.groupKey;
       Object.entries(tv.byName||{}).forEach(([n, nv]) => {
-        if (!typeMap[t].byName[n]) typeMap[t].byName[n] = {cnt:0,qty:0,amt:0};
+        if (!typeMap[t].byName[n]) typeMap[t].byName[n] = {cnt:0,qty:0,amt:0,items:{}};
         typeMap[t].byName[n].cnt += nv.cnt;
         typeMap[t].byName[n].qty = (typeMap[t].byName[n].qty||0) + (nv.qty||0);
         typeMap[t].byName[n].amt += nv.amt;
+        if (!typeMap[t].byName[n].items) typeMap[t].byName[n].items = {};
+        Object.entries(nv.items || {}).forEach(([itemName, item]) => {
+          if (!typeMap[t].byName[n].items[itemName]) typeMap[t].byName[n].items[itemName] = {cnt:0,qty:0,amt:0};
+          typeMap[t].byName[n].items[itemName].cnt += Number(item.cnt) || 0;
+          typeMap[t].byName[n].items[itemName].qty += Number(item.qty) || 0;
+          typeMap[t].byName[n].items[itemName].amt += Number(item.amt) || 0;
+        });
       });
     });
   });
@@ -903,7 +910,7 @@ function renderPeriodTable(wrapId, items, color, period) {
       const icon = isColor
         ? `<span style="font-size:12px;margin-right:4px;flex-shrink:0">🎨</span>`
         : `<span style="font-size:12px;margin-right:4px;flex-shrink:0">⚙</span>`;
-      const edata = JSON.stringify({name:n, isColor, cnt:nv.cnt, qty:nv.qty||0, amt:nv.amt, typeNm:t});
+      const edata = JSON.stringify({name:n, isColor, cnt:nv.cnt, qty:nv.qty||0, amt:nv.amt, typeNm:t, items:nv.items||{}});
       html += `<div class="sub-row" style="cursor:pointer" title="더블클릭으로 상세보기" ondblclick="showEquipModal(this)">
         <span class="sub-num">${j+1}</span>
         <span class="sub-name">${icon}<strong>${n}</strong></span>
@@ -969,6 +976,49 @@ function toggleGroup(uid) {
   sub.style.display = open ? 'none' : '';
   if (arr) arr.textContent = open ? '▼' : '▲';
 }
+function buildEquipModalItemRows(items) {
+  return Object.entries(items || {}).map(([itemName, item]) => ({
+    itemName,
+    cnt: Number(item && item.cnt) || 0,
+    qty: Number(item && item.qty) || 0,
+    amt: Number(item && item.amt) || 0
+  })).filter(row => row.itemName && (row.cnt || row.qty || row.amt))
+    .sort((a,b) => b.qty - a.qty || b.amt - a.amt || b.cnt - a.cnt || a.itemName.localeCompare(b.itemName, 'ko'));
+}
+
+function renderEquipModalItemRows(rows) {
+  if (!rows.length) return '';
+  const tCnt = rows.reduce((sum, row) => sum + row.cnt, 0);
+  const tQty = rows.reduce((sum, row) => sum + row.qty, 0);
+  const tAmt = rows.reduce((sum, row) => sum + row.amt, 0);
+  return (
+    '<table style="width:100%;border-collapse:collapse;font-size:13px">' +
+      '<thead><tr style="background:var(--surface-2);color:var(--text-2)">' +
+        '<th style="padding:7px 8px;text-align:center;border-bottom:1px solid var(--border);white-space:nowrap">No</th>' +
+        '<th style="padding:7px 8px;text-align:left;border-bottom:1px solid var(--border)">\uD488\uBAA9\uBA85</th>' +
+        '<th style="padding:7px 8px;text-align:center;border-bottom:1px solid var(--border)">\uAC74\uC218</th>' +
+        '<th style="padding:7px 8px;text-align:center;border-bottom:1px solid var(--border)">\uC218\uB7C9</th>' +
+        '<th style="padding:7px 8px;text-align:center;border-bottom:1px solid var(--border)">\uAE08\uC561</th>' +
+      '</tr></thead>' +
+      '<tbody>' + rows.map((row, i) =>
+        '<tr style="background:' + (i % 2 === 0 ? 'transparent' : 'var(--surface-2)') + '">' +
+          '<td style="padding:6px 8px;text-align:center;color:var(--text-2);white-space:nowrap">' + (i + 1) + '</td>' +
+          '<td style="padding:6px 8px;text-align:left;font-weight:600">' + escapeHtml(row.itemName) + '</td>' +
+          '<td style="padding:6px 8px;text-align:center">' + row.cnt.toLocaleString() + '\uAC74</td>' +
+          '<td style="padding:6px 8px;text-align:center">' + row.qty.toLocaleString() + 'ea</td>' +
+          '<td style="padding:6px 8px;text-align:center">' + row.amt.toLocaleString() + '\uC6D0</td>' +
+        '</tr>'
+      ).join('') + '</tbody>' +
+      '<tfoot><tr style="background:var(--surface-2);font-weight:700;border-top:2px solid var(--border)">' +
+        '<td colspan="2" style="padding:7px 8px;text-align:right;color:var(--text-2)">\uD569\uACC4</td>' +
+        '<td style="padding:7px 8px;text-align:center">' + tCnt.toLocaleString() + '\uAC74</td>' +
+        '<td style="padding:7px 8px;text-align:center">' + tQty.toLocaleString() + 'ea</td>' +
+        '<td style="padding:7px 8px;text-align:center">' + tAmt.toLocaleString() + '\uC6D0</td>' +
+      '</tr></tfoot>' +
+    '</table>'
+  );
+}
+
 function showEquipModal(rowEl) {
   const arrEl = rowEl.querySelector('.sub-arr');
   if (!arrEl) return;
@@ -979,6 +1029,13 @@ function showEquipModal(rowEl) {
   const filterKey = d.isColor ? '색상' : '설비명';
   document.getElementById('equip-modal-title').innerHTML =
     `${icon} <strong>${d.name}</strong> <span style="font-size:12px;font-weight:400;color:var(--text-2);margin-left:6px">[${d.typeNm}] ${d.cnt}건 · ${d.qty}ea · ${d.amt.toLocaleString()}원</span>`;
+
+  const itemRows = buildEquipModalItemRows(d.items);
+  if (itemRows.length) {
+    document.getElementById('equip-modal-body').innerHTML = renderEquipModalItemRows(itemRows);
+    document.getElementById('equip-modal').classList.add('open');
+    return;
+  }
 
   // RAW_DATA에서 해당 유형 + 설비명/색상 필터링
   const rows = RAW_DATA.filter(r =>
