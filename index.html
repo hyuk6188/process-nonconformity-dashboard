@@ -1036,6 +1036,26 @@ function updateKpi(kpiId, cards) {
     </div>`).join('');
 }
 
+function updatePeriodKpi(kpiId, sourceItems, color) {
+  const items = (sourceItems || []).filter(Boolean);
+  const totalQty = items.reduce((s,it)=>s+(it.qty||0),0);
+  const totalAmt = items.reduce((s,it)=>s+(it.amt||0),0);
+  const typeCnt = {};
+  const typeQty = {};
+  items.forEach(it=>{
+    Object.entries(it.byType||{}).forEach(([type,tv])=>{
+      typeCnt[type] = (typeCnt[type]||0) + (tv.cnt||0);
+      typeQty[type] = (typeQty[type]||0) + (tv.qty||0);
+    });
+  });
+  const top = Object.entries(typeQty).sort((a,b)=>b[1]-a[1] || (typeCnt[b[0]]||0)-(typeCnt[a[0]]||0))[0];
+  updateKpi(kpiId,[
+    {lbl:'부적합 수량',val:totalQty.toLocaleString(),sub:'ea',color:'#e53935'},
+    {lbl:'총 손실 금액',val:totalAmt.toLocaleString(),sub:'원',color:'#e53935'},
+    {lbl:'주요 부적합 유형',val:top?top[0]:'-',sub:(top?(top[1]||0):0).toLocaleString()+'ea',color}
+  ]);
+}
+
 // ── 차트 인스턴스 관리 ────────────────────────────────────
 const _charts = {};
 function drawFallbackChart(id, type, labels, data, color, isAmt, items, onPointClick) {
@@ -1237,13 +1257,15 @@ function bindKpiDblClick(kpiId, color, periodType, items) {
 
 // ── 일별 탭 ──────────────────────────────────────────────
 // 날짜 → 해당 주의 수요일 기반 월내 주차 레이블 (예: "2주")
-function makePeriodDetailClick(detailId, allItems, color, periodLabel, chartId, infoId) {
+function makePeriodDetailClick(detailId, allItems, color, periodLabel, chartId, infoId, kpiId) {
   let selectedIdx = null;
   const totalQty = () => allItems.reduce((sum, item) => sum + (item.qty || 0), 0);
   return function(it, idx) {
+    if(!it || it._empty) return;
     const reset = selectedIdx === idx;
     selectedIdx = reset ? null : idx;
     renderPeriodTable(detailId, reset ? allItems : [it], color, periodLabel);
+    if(kpiId) updatePeriodKpi(kpiId, reset ? allItems : [it], color);
     if(infoId) {
       const info = document.getElementById(infoId);
       if(info) info.textContent = reset
@@ -1542,22 +1564,11 @@ function drawWeekly() {
   // lbl 필드를 포맷된 라벨로 교체 (테이블·KPI에서 "YYYY-Www" 대신 표시)
   items.forEach((it, i) => { it.lbl = wLbl(realKeys[i]); });
   chartItems.forEach((it, i) => { it.lbl = wLbl(keys[i]); });
-  makeChartSafe('ch-weekly','bar',keys.map(wLbl),cnts,'rgba(26,86,219,0.72)',false,chartItems,'\uC8FC\uBCC4',makePeriodDetailClick('detail-weekly',items,'#8e24aa','\uC8FC\uBCC4','ch-weekly','week-filter-info'));
+  makeChartSafe('ch-weekly','bar',keys.map(wLbl),cnts,'rgba(26,86,219,0.72)',false,chartItems,'\uC8FC\uBCC4',makePeriodDetailClick('detail-weekly',items,'#8e24aa','\uC8FC\uBCC4','ch-weekly','week-filter-info','kpi-weekly'));
   makeChartSafe('ch-weekly-amt','line',keys.map(wLbl),amts,'rgb(194,65,12)',true,chartItems,'\uC8FC\uBCC4');
   renderPeriodTable('detail-weekly',items,'#8e24aa','주별');
   if(items.length) {
-    const tCntW=items.reduce((s,it)=>s+it.cnt,0);
-    const tQtyW=items.reduce((s,it)=>s+it.qty,0);
-    const tAmtW=items.reduce((s,it)=>s+it.amt,0);
-    const _typeCntW={}, _typeQtyW={};
-    items.forEach(it=>{Object.entries(it.byType||{}).forEach(([t,tv])=>{_typeCntW[t]=(_typeCntW[t]||0)+tv.cnt; _typeQtyW[t]=(_typeQtyW[t]||0)+tv.qty;});});
-    const _topW=Object.entries(_typeQtyW).sort((a,b)=>b[1]-a[1] || (_typeCntW[b[0]]||0)-(_typeCntW[a[0]]||0))[0];
-    const _topQtyW=_topW?(_typeQtyW[_topW[0]]||0):0;
-    updateKpi('kpi-weekly',[
-      {lbl:'부적합 수량',val:tQtyW.toLocaleString(),sub:'ea',color:'#e53935'},
-      {lbl:'총 손실 금액',val:tAmtW.toLocaleString(),sub:'원',color:'#e53935'},
-      {lbl:'주요 부적합 유형',val:_topW?_topW[0]:'-',sub:_topQtyW+'ea',color:'#8e24aa'}
-    ]);
+    updatePeriodKpi('kpi-weekly', items, '#8e24aa');
     bindKpiDblClick('kpi-weekly','#8e24aa','주별',items);
   }
 }
@@ -1605,6 +1616,7 @@ function drawMonthly() {
     const reset = selectedMonthIdx === idx;
     selectedMonthIdx = reset ? null : idx;
     renderPeriodTable('detail-monthly', reset ? items : [it], '#00acc1', '월별');
+    updatePeriodKpi('kpi-monthly', reset ? items : [it], '#00acc1');
     const info = document.getElementById('month-filter-info');
     if(info) info.textContent = reset
       ? `${items.length}\uAC1C\uC6D4 \u00B7 \uD569\uACC4 ${items.reduce((s,item)=>s+item.qty,0).toLocaleString()}ea`
@@ -1616,18 +1628,7 @@ function drawMonthly() {
   makeChart('ch-monthly-amt-tab','line',chartKeys.map(mLbl),amts,'rgb(194,65,12)',true,chartItems,'월별');
   renderPeriodTable('detail-monthly',items,'#00acc1','월별');
   if(items.length) {
-    const tCntM=items.reduce((s,it)=>s+it.cnt,0);
-    const tQtyM=items.reduce((s,it)=>s+it.qty,0);
-    const tAmtM=items.reduce((s,it)=>s+it.amt,0);
-    const _typeCntM={}, _typeQtyM={};
-    items.forEach(it=>{Object.entries(it.byType||{}).forEach(([t,tv])=>{_typeCntM[t]=(_typeCntM[t]||0)+tv.cnt; _typeQtyM[t]=(_typeQtyM[t]||0)+tv.qty;});});
-    const _topM=Object.entries(_typeQtyM).sort((a,b)=>b[1]-a[1] || (_typeCntM[b[0]]||0)-(_typeCntM[a[0]]||0))[0];
-    const _topQtyM=_topM?(_typeQtyM[_topM[0]]||0):0;
-    updateKpi('kpi-monthly',[
-      {lbl:'부적합 수량',val:tQtyM.toLocaleString(),sub:'ea',color:'#e53935'},
-      {lbl:'총 손실 금액',val:tAmtM.toLocaleString(),sub:'원',color:'#e53935'},
-      {lbl:'주요 부적합 유형',val:_topM?_topM[0]:'-',sub:_topQtyM+'ea',color:'#00acc1'}
-    ]);
+    updatePeriodKpi('kpi-monthly', items, '#00acc1');
     bindKpiDblClick('kpi-monthly','#00acc1','월별',items);
   }
 }
@@ -1676,6 +1677,7 @@ function drawYearly() {
     const reset = selectedYearIdx === idx;
     selectedYearIdx = reset ? null : idx;
     renderPeriodTable('detail-yearly', reset ? items : [it], '#1e88e5', '연별');
+    updatePeriodKpi('kpi-yearly', reset ? items : [it], '#1e88e5');
     updateYearlyChartHighlight(selectedYearIdx);
   };
   makeChart('ch-yearly-cnt','bar',yLbl,yCnt,'rgba(26,86,219,0.72)',false,chartItems,'연별',yearlyClick);
@@ -1683,18 +1685,7 @@ function drawYearly() {
   makeChart('ch-yearly-amt','line',yLbl,yAmt,'rgb(194,65,12)',true,chartItems,'연별',yearlyClick);
   renderPeriodTable('detail-yearly',items,'#1e88e5','연별');
   if(items.length) {
-    const tCntY=items.reduce((s,it)=>s+it.cnt,0);
-    const tQtyY=items.reduce((s,it)=>s+it.qty,0);
-    const tAmtY=items.reduce((s,it)=>s+it.amt,0);
-    const _typeCntY={}, _typeQtyY={};
-    items.forEach(it=>{Object.entries(it.byType||{}).forEach(([t,tv])=>{_typeCntY[t]=(_typeCntY[t]||0)+tv.cnt; _typeQtyY[t]=(_typeQtyY[t]||0)+tv.qty;});});
-    const _topY=Object.entries(_typeQtyY).sort((a,b)=>b[1]-a[1] || (_typeCntY[b[0]]||0)-(_typeCntY[a[0]]||0))[0];
-    const _topQtyY=_topY?(_typeQtyY[_topY[0]]||0):0;
-    updateKpi('kpi-yearly',[
-      {lbl:'부적합 수량',val:tQtyY.toLocaleString(),sub:'ea',color:'#e53935'},
-      {lbl:'총 손실 금액',val:tAmtY.toLocaleString(),sub:'원',color:'#e53935'},
-      {lbl:'주요 부적합 유형',val:_topY?_topY[0]:'-',sub:_topQtyY+'ea',color:'#1e88e5'}
-    ]);
+    updatePeriodKpi('kpi-yearly', items, '#1e88e5');
     bindKpiDblClick('kpi-yearly','#1e88e5','연별',items);
   }
 }
