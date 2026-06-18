@@ -763,6 +763,18 @@ Chart.defaults.font = baseFont;
 Chart.defaults.color = '#6b6b66';
 const palette = ["#1e88e5", "#e53935", "#43a047", "#fb8c00", "#8e24aa", "#00acc1", "#f4511e", "#3949ab", "#00897b", "#fdd835"];
 
+function amtFmt(value) {
+  const n = Number(value) || 0;
+  return Math.round(n).toLocaleString() + '\uC6D0';
+}
+
+function escapeHtml(value) {
+  return String(value == null ? '' : value).replace(/[&<>"']/g, ch => ({
+    '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'
+  }[ch]));
+}
+
+
 // ── 탭별 지연 렌더링 플래그 ──────────────────────────────
 const _drawn = {};
 
@@ -1075,6 +1087,16 @@ function drawFallbackChart(id, type, labels, data, color, isAmt, items, onPointC
   };
   _charts[id] = {fallback:true, update(){ drawFallbackChart(id, type, labels, data, color, isAmt, items, onPointClick); }, destroy(){ canvas.onclick = null; }};
 }
+
+function makeChartSafe(id, type, labels, data, color, isAmt, items, periodType, onBarClick) {
+  try {
+    makeChart(id, type, labels, data, color, isAmt, items, periodType, onBarClick);
+  } catch (err) {
+    console.error('Chart render failed before fallback; using canvas fallback:', id, err);
+    drawFallbackChart(id, type, labels, data, color, isAmt, items, onBarClick);
+  }
+}
+
 function makeChart(id, type, labels, data, color, isAmt, items, periodType, onBarClick) {
   if(_charts[id]) _charts[id].destroy();
   const datalabelsPlugin = {
@@ -1386,8 +1408,8 @@ function drawDaily() {
     }
   }
 
-  makeChart('ch-daily','bar',chartKeys.map(dLbl),cnts,'rgba(26,86,219,0.72)',false,chartItems,'\uC77C\uBCC4',dailyPointClick);
-  makeChart('ch-daily-amt','line',chartKeys.map(dLbl),amts,'rgb(194,65,12)',true,chartItems,'\uC77C\uBCC4',dailyPointClick);
+  makeChartSafe('ch-daily','bar',chartKeys.map(dLbl),cnts,'rgba(26,86,219,0.72)',false,chartItems,'\uC77C\uBCC4',dailyPointClick);
+  makeChartSafe('ch-daily-amt','line',chartKeys.map(dLbl),amts,'rgb(194,65,12)',true,chartItems,'\uC77C\uBCC4',dailyPointClick);
   renderDailyDetailSafe('detail-daily', items, '#43a047');
 }
 
