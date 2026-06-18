@@ -1511,6 +1511,10 @@ function drawWeekly() {
   // "YYYY-Www" → 월 선택 시 "N주", 년도만 선택 시 "M월 N주"
   const wLbl = k => {
     if(String(k).startsWith('__empty_week_')) return String(k).replace('__empty_week_', '') + '\uC8FC';
+    if(month) {
+      const idx = keys.indexOf(k);
+      return (idx >= 0 ? idx + 1 : 0) + '\uC8FC';
+    }
     const wed = wedDateOfWeek(k);
     const mo = wed.getMonth() + 1;
     const firstDow = (new Date(wed.getFullYear(), wed.getMonth(), 1).getDay() + 6) % 7;
