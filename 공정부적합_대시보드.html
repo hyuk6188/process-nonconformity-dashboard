@@ -772,6 +772,11 @@ function amtAxisFmt(value) {
   return Math.round(n / 1000000).toLocaleString() + '\uBC31\uB9CC\uC6D0';
 }
 
+function amtPointFmt(value) {
+  const n = Number(value) || 0;
+  return Math.round(n / 1000000).toLocaleString();
+}
+
 function escapeHtml(value) {
   return String(value == null ? '' : value).replace(/[&<>"']/g, ch => ({
     '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'
@@ -1076,7 +1081,7 @@ function drawFallbackChart(id, type, labels, data, color, isAmt, items, onPointC
       if(p.v) {
         ctx.fillStyle = '#1a1a18';
         ctx.textBaseline = 'bottom';
-        ctx.fillText(isAmt ? Math.round(p.v/10000).toLocaleString() : Math.round(p.v).toLocaleString(), p.x, p.y - 7);
+        ctx.fillText(isAmt ? amtPointFmt(p.v) : Math.round(p.v).toLocaleString(), p.x, p.y - 7);
       }
     });
   }
@@ -1109,7 +1114,7 @@ function makeChart(id, type, labels, data, color, isAmt, items, periodType, onBa
     offset: 4,
     font:{size:10, weight:'500'},
     color:'var(--text-2)',
-    formatter: v => (v===null||v===0) ? '' : (type==='line' ? (isAmt ? Math.round(v/10000) : v) : (isAmt ? amtFmt(v) : v.toLocaleString()))
+    formatter: v => (v===null||v===0) ? '' : (type==='line' ? (isAmt ? amtPointFmt(v) : v) : (isAmt ? amtFmt(v) : v.toLocaleString()))
   };
   const opts = {responsive:true,maintainAspectRatio:false,
     layout:{padding:{top:22}},
