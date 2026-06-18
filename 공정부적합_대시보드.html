@@ -773,6 +773,20 @@ function fmtMillionWon(value) {
   return Number.isInteger(million) ? million.toLocaleString() : million.toLocaleString(undefined, { maximumFractionDigits: 1 });
 }
 
+function amtTickStep(maxValue) {
+  const max = Number(maxValue) || 0;
+  if(max <= 2500000) return 500000;
+  if(max <= 10000000) return 1000000;
+  if(max <= 50000000) return 5000000;
+  if(max <= 100000000) return 10000000;
+  return 50000000;
+}
+
+function amtAxisMax(maxValue) {
+  const step = amtTickStep(maxValue);
+  return Math.max(step, Math.ceil((Number(maxValue) || 0) / step) * step);
+}
+
 function amtAxisFmt(value) {
   return fmtMillionWon(value) + '\uBC31\uB9CC\uC6D0';
 }
@@ -1031,16 +1045,19 @@ function drawFallbackChart(id, type, labels, data, color, isAmt, items, onPointC
   const plotW = Math.max(1, width - pad.left - pad.right);
   const plotH = Math.max(1, height - pad.top - pad.bottom);
   const values = (data || []).map(v => Number(v) || 0);
-  const max = Math.max(1, ...values);
+  const rawMax = Math.max(1, ...values);
+  const max = isAmt ? amtAxisMax(rawMax) : rawMax;
   ctx.strokeStyle = 'rgba(0,0,0,.08)';
   ctx.fillStyle = '#6b6b66';
   ctx.font = '10px sans-serif';
   ctx.textAlign = 'right';
   ctx.textBaseline = 'middle';
-  for(let i=0;i<=4;i++) {
-    const y = pad.top + plotH - plotH * i / 4;
+  const tickStep = isAmt ? amtTickStep(max) : max / 4;
+  const tickCount = isAmt ? Math.max(1, Math.round(max / tickStep)) : 4;
+  for(let i=0;i<=tickCount;i++) {
+    const y = pad.top + plotH - plotH * i / tickCount;
     ctx.beginPath(); ctx.moveTo(pad.left,y); ctx.lineTo(width-pad.right,y); ctx.stroke();
-    const tick = max * i / 4;
+    const tick = tickStep * i;
     ctx.fillText(isAmt ? amtAxisFmt(tick) : Math.round(tick).toLocaleString(), pad.left - 6, y);
   }
   ctx.strokeStyle = 'rgba(0,0,0,.18)';
@@ -1125,7 +1142,8 @@ function makeChart(id, type, labels, data, color, isAmt, items, periodType, onBa
     plugins:{legend:{display:false}, datalabels:datalabelsPlugin},
     scales:{x:{ticks:{maxRotation:45,font:{size:10}},grid:{color:gridColor}},
              y:{beginAtZero:true,grid:{color:gridColor},
-               ticks:isAmt?{callback:amtAxisFmt}:{}}} };
+               suggestedMax:isAmt?amtAxisMax(Math.max(1, ...(data || []).map(v => Number(v) || 0))):undefined,
+               ticks:isAmt?{callback:amtAxisFmt, stepSize:amtTickStep(Math.max(1, ...(data || []).map(v => Number(v) || 0)))}:{}}} };
   if(typeof Chart === 'undefined') {
     console.warn('Chart.js is not ready; using fallback chart:', id);
     drawFallbackChart(id, type, labels, data, color, isAmt, items, onBarClick);
