@@ -836,15 +836,15 @@ function renderPeriodTable(wrapId, items, color, period) {
       });
     });
   });
-  const types = Object.entries(typeMap).sort((a,b)=>b[1].cnt-a[1].cnt);
+  const types = Object.entries(typeMap).sort((a,b)=>b[1].qty-a[1].qty || b[1].amt-a[1].amt || b[1].cnt-a[1].cnt);
   let html = '';
   types.forEach(([t, tv], i) => {
-    const pct = tCnt ? Math.round(tv.cnt/tCnt*100) : 0;
+    const pct = tQty ? Math.round(tv.qty/tQty*100) : 0;
     const c = typeColors[i % typeColors.length];
     const uid = wrapId+'-t'+i;
     const isColor = tv.groupKey === 'color';
     const subLabel = isColor ? '색상' : '설비명';
-    const subs = Object.entries(tv.byName).sort((a,b)=>b[1].cnt-a[1].cnt);
+    const subs = Object.entries(tv.byName).sort((a,b)=>b[1].qty-a[1].qty || b[1].amt-a[1].amt || b[1].cnt-a[1].cnt);
     html += `<div class="type-group">
       <div class="type-row" onclick="toggleGroup('${uid}')">
         <span class="type-bar" style="background:${c}"></span>
@@ -1499,7 +1499,7 @@ function drawWeekly() {
     const tAmtW=items.reduce((s,it)=>s+it.amt,0);
     const _typeCntW={}, _typeQtyW={};
     items.forEach(it=>{Object.entries(it.byType||{}).forEach(([t,tv])=>{_typeCntW[t]=(_typeCntW[t]||0)+tv.cnt; _typeQtyW[t]=(_typeQtyW[t]||0)+tv.qty;});});
-    const _topW=Object.entries(_typeCntW).sort((a,b)=>b[1]-a[1])[0];
+    const _topW=Object.entries(_typeQtyW).sort((a,b)=>b[1]-a[1] || (_typeCntW[b[0]]||0)-(_typeCntW[a[0]]||0))[0];
     const _topQtyW=_topW?(_typeQtyW[_topW[0]]||0):0;
     updateKpi('kpi-weekly',[
       {lbl:'부적합 수량',val:tQtyW.toLocaleString(),sub:'ea',color:'#e53935'},
@@ -1569,7 +1569,7 @@ function drawMonthly() {
     const tAmtM=items.reduce((s,it)=>s+it.amt,0);
     const _typeCntM={}, _typeQtyM={};
     items.forEach(it=>{Object.entries(it.byType||{}).forEach(([t,tv])=>{_typeCntM[t]=(_typeCntM[t]||0)+tv.cnt; _typeQtyM[t]=(_typeQtyM[t]||0)+tv.qty;});});
-    const _topM=Object.entries(_typeCntM).sort((a,b)=>b[1]-a[1])[0];
+    const _topM=Object.entries(_typeQtyM).sort((a,b)=>b[1]-a[1] || (_typeCntM[b[0]]||0)-(_typeCntM[a[0]]||0))[0];
     const _topQtyM=_topM?(_typeQtyM[_topM[0]]||0):0;
     updateKpi('kpi-monthly',[
       {lbl:'부적합 수량',val:tQtyM.toLocaleString(),sub:'ea',color:'#e53935'},
@@ -1620,7 +1620,7 @@ function drawYearly() {
     const tAmtY=items.reduce((s,it)=>s+it.amt,0);
     const _typeCntY={}, _typeQtyY={};
     items.forEach(it=>{Object.entries(it.byType||{}).forEach(([t,tv])=>{_typeCntY[t]=(_typeCntY[t]||0)+tv.cnt; _typeQtyY[t]=(_typeQtyY[t]||0)+tv.qty;});});
-    const _topY=Object.entries(_typeCntY).sort((a,b)=>b[1]-a[1])[0];
+    const _topY=Object.entries(_typeQtyY).sort((a,b)=>b[1]-a[1] || (_typeCntY[b[0]]||0)-(_typeCntY[a[0]]||0))[0];
     const _topQtyY=_topY?(_typeQtyY[_topY[0]]||0):0;
     updateKpi('kpi-yearly',[
       {lbl:'부적합 수량',val:tQtyY.toLocaleString(),sub:'ea',color:'#e53935'},
@@ -1652,7 +1652,7 @@ function showPeriodModal(period, label, color, cnt, qty, amt, cause, reason, dec
       typeMap[t].cnt+=tv.cnt; typeMap[t].qty+=tv.qty; typeMap[t].amt+=tv.amt;
     });
   });
-  const types = Object.entries(typeMap).sort((a,b)=>b[1].cnt-a[1].cnt);
+  const types = Object.entries(typeMap).sort((a,b)=>b[1].qty-a[1].qty || b[1].amt-a[1].amt || b[1].cnt-a[1].cnt);
   const typeColors = ['#e53935','#fb8c00','#8e24aa','#1e88e5','#00acc1','#43a047','#6d4c41','#546e7a'];
 
   const decCls=dec==='폐기'?'color:#c62828':dec==='재작업'?'color:#1565c0':'color:#555';
@@ -1662,7 +1662,7 @@ function showPeriodModal(period, label, color, cnt, qty, amt, cause, reason, dec
       <div style="font-size:12px;color:var(--text-2);margin-bottom:6px;font-weight:600">부적합유형별 현황</div>`;
     types.forEach(([t,tv],i)=>{
       const c=typeColors[i%typeColors.length];
-      const pct=cnt?Math.round(tv.cnt/cnt*100):0;
+      const pct=qty?Math.round(tv.qty/qty*100):0;
       typeHtml+=`<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--surface-2)">
         <span style="width:18px;height:18px;border-radius:50%;background:${c};display:flex;align-items:center;justify-content:center;color:#fff;font-size:10px;font-weight:700;flex-shrink:0">${i+1}</span>
         <span style="flex:1;font-size:13px;font-weight:500">${t}</span>
