@@ -1631,11 +1631,11 @@ function drawWeekly() {
     keys = Array.from(allowedMonthWeeks);
     while(keys.length < 5) keys.push('__empty_week_' + (keys.length + 1));
   }
-  const emptyWeek = k => ({key:k,lbl:k,cnt:0,qty:0,amt:0,cause:'-',reason:'-',dec:'-',discard:0,rework:0,byType:{}});
+  const emptyWeek = k => ({key:k,lbl:k,cnt:0,qty:0,amt:0,cause:'-',reason:'-',dec:'-',discard:0,rework:0,byType:{},_empty:true});
   const chartItems = keys.map(k=>({key:k,...(WEEKLY_ALL[k] || emptyWeek(k))}));
   const items= realKeys.map(k=>({key:k,...WEEKLY_ALL[k]}));
-  const cnts = chartItems.map(it=>it.qty || 0);
-  const amts = chartItems.map(it=>it.amt || 0);
+  const cnts = chartItems.map(it=>it._empty ? null : (it.qty || 0));
+  const amts = chartItems.map(it=>it._empty ? null : (it.amt || 0));
   const lbl  = (year||'전체')+(month?` ${parseInt(month)}월`:'')+' 주별';
   document.getElementById('lbl-weekly-cnt').textContent=lbl+' 발생 수량';
   document.getElementById('lbl-weekly-amt').textContent=lbl+' 손실금액';
