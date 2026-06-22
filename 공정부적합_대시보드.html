@@ -1421,6 +1421,9 @@ function selectWeeklyDate(dateText) {
 
 function initDaySelectors() {
   const sy = document.getElementById('sel-day-year');
+  const years = dataYearsFromKeys(DAILY_ALL);
+  DAY_YEARS.splice(0, DAY_YEARS.length, ...years);
+  sy.innerHTML = '';
   DAY_YEARS.forEach(y=>{ const o=document.createElement('option'); o.value=y; o.textContent=y+'년'; sy.appendChild(o); });
   const latestDate = latestRecordDate(RAW_DATA);
   if(!selectDailyDate(latestDate)) {
@@ -2467,6 +2470,7 @@ function reaggregate() {
   replaceAggregate(WEEKLY_ALL, flatten(W));
   replaceAggregate(MONTHLY_ALL, flatten(M));
   replaceAggregate(YEARLY_ALL, flatten(Y));
+  initDaySelectors();
   initWeekSelectors();
   initMonthSelectors();
   initYearSelectors();
