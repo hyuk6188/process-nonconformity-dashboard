@@ -107,6 +107,12 @@
   .type-amt em{font-style:normal;color:var(--text-3);font-size:12px}
   .type-arr{color:var(--text-3);font-size:11px;width:14px;text-align:center;flex-shrink:0}
   .sub-row{display:flex;align-items:center;padding:7px 14px 7px 50px;border-top:1px solid var(--border);background:var(--bg);gap:8px}
+  .period-breakdown{border-top:1px solid var(--border);background:var(--surface-2);padding:8px 14px 8px 50px}
+  .period-breakdown-title{font-size:13px;font-weight:700;color:var(--text);margin-bottom:5px}
+  .period-breakdown-row{display:grid;grid-template-columns:minmax(120px,1fr) 90px 120px;align-items:center;gap:12px;padding:5px 8px;border-top:1px solid var(--border);font-size:13px;color:var(--text-2)}
+  .period-breakdown-row:first-of-type{border-top:0}
+  .period-breakdown-label{font-weight:600;color:var(--text)}
+  .period-breakdown-value{text-align:right;white-space:nowrap}
   .sub-num{color:var(--text-3);font-size:11px;width:16px;flex-shrink:0}
   .sub-name{flex:1;font-size:14px;color:var(--text-2)}
   .sub-cnt{color:#e53935;font-weight:700;font-size:14px;min-width:60px;text-align:right}
@@ -867,6 +873,16 @@ const decBadge = dec => {
 
 // ── 공통 유형 그룹 카드 렌더 ─────────────────────────────
 const _COLOR_TYPES_JS = new Set(['원자재부적합','스크래치']);
+function periodDetailLabel(period, item) {
+  const key = String((item && item.key) || '');
+  const label = String((item && item.lbl) || key || '-');
+  if (period === '일별' && /^\d{4}-\d{2}-\d{2}$/.test(key)) return key + (label !== key ? ' ' + label : '');
+  if (period === '주별') return label || key;
+  if (period === '월별' && /^\d{4}-\d{2}$/.test(key)) return key.slice(0,4) + '년 ' + parseInt(key.slice(5),10) + '월';
+  if (period === '연별' && /^\d{4}$/.test(key)) return key + '년';
+  return label;
+}
+
 function renderPeriodTable(wrapId, items, color, period) {
   const wrap = document.getElementById(wrapId);
   if (!wrap) return;
@@ -877,10 +893,17 @@ function renderPeriodTable(wrapId, items, color, period) {
     tCnt+=it.cnt; tQty+=it.qty; tAmt+=it.amt;
     if (!it.byType) return;
     Object.entries(it.byType).forEach(([t, tv]) => {
-      if (!typeMap[t]) typeMap[t] = {cnt:0,qty:0,amt:0,byName:{},groupKey:tv.groupKey||'equip'};
+      if (!typeMap[t]) typeMap[t] = {cnt:0,qty:0,amt:0,byName:{},byPeriod:{},groupKey:tv.groupKey||'equip'};
       typeMap[t].cnt += tv.cnt;
       typeMap[t].qty += tv.qty;
       typeMap[t].amt += tv.amt;
+      const periodKey = it.key || it.lbl || '-';
+      if (!typeMap[t].byPeriod[periodKey]) {
+        typeMap[t].byPeriod[periodKey] = {label:periodDetailLabel(period, it),cnt:0,qty:0,amt:0};
+      }
+      typeMap[t].byPeriod[periodKey].cnt += Number(tv.cnt) || 0;
+      typeMap[t].byPeriod[periodKey].qty += Number(tv.qty) || 0;
+      typeMap[t].byPeriod[periodKey].amt += Number(tv.amt) || 0;
       if (tv.groupKey) typeMap[t].groupKey = tv.groupKey;
       Object.entries(tv.byName||{}).forEach(([n, nv]) => {
         if (!typeMap[t].byName[n]) typeMap[t].byName[n] = {cnt:0,qty:0,amt:0,items:{}};
@@ -906,6 +929,7 @@ function renderPeriodTable(wrapId, items, color, period) {
     const isColor = tv.groupKey === 'color';
     const subLabel = isColor ? '색상' : '설비명';
     const subs = Object.entries(tv.byName).sort((a,b)=>b[1].qty-a[1].qty || b[1].amt-a[1].amt || b[1].cnt-a[1].cnt);
+    const periods = Object.entries(tv.byPeriod || {}).sort((a,b)=>String(a[0]).localeCompare(String(b[0]), 'ko'));
     html += `<div class="type-group">
       <div class="type-row" onclick="toggleGroup('${uid}')">
         <span class="type-bar" style="background:${c}"></span>
@@ -916,6 +940,16 @@ function renderPeriodTable(wrapId, items, color, period) {
         <span class="type-arr" id="arr-${uid}">▼</span>
       </div>
       <div id="sub-${uid}" style="display:none">`;
+    if (periods.length) {
+      html += `<div class="period-breakdown">
+        <div class="period-breakdown-title">${period || '기간'} 날짜별 현황</div>
+        ${periods.map(([, pv]) => `<div class="period-breakdown-row">
+          <span class="period-breakdown-label">${escapeHtml(pv.label)}</span>
+          <span class="period-breakdown-value">${pv.qty.toLocaleString()}ea</span>
+          <span class="period-breakdown-value">${pv.amt.toLocaleString()}원</span>
+        </div>`).join('')}
+      </div>`;
+    }
     subs.forEach(([n, nv], j) => {
       const icon = isColor
         ? `<span style="font-size:12px;margin-right:4px;flex-shrink:0">🎨</span>`
@@ -2122,6 +2156,7 @@ function syncActionListDebounced() {
 function syncNoteDebounced(value) {
   if(!syncUrl()) return;
   clearTimeout(_syncNoteTimer);
+  setSyncStatus('특이사항 저장 중', 'busy');
   _syncNoteTimer = setTimeout(async () => {
     try {
       const data = await syncRequest('saveSetting', {key:'al_note_v1', value});
@@ -2516,6 +2551,12 @@ function alSave() {
   localStorage.setItem(AL_KEY, JSON.stringify(AL_ITEMS));
 }
 
+function alPersist({render=true, sync=true} = {}) {
+  alSave();
+  if(render) alRender();
+  if(sync) syncActionListDebounced();
+}
+
 function alRender() {
   const search = (document.getElementById('al-search')?.value||'').toLowerCase();
   const fEquip  = document.getElementById('al-f-equip')?.value||'';
@@ -2610,7 +2651,7 @@ function alSaveAdd() {
     담당자: document.getElementById('al-user').value.trim(),
     일정:'', 상태:'대기', 비고:''
   });
-  alSave(); alRender(); alCloseAdd();
+  alPersist(); alCloseAdd();
   document.getElementById('al-equip').value='';
   document.getElementById('al-check').value='';
   document.getElementById('al-symptom').value='';
@@ -2620,12 +2661,12 @@ function alSaveAdd() {
 function alDelete(id) {
   if(!confirm('삭제하시겠습니까?')) return;
   AL_ITEMS = AL_ITEMS.filter(i=>i.id!==id);
-  alSave(); alRender();
+  alPersist();
 }
 
 function alSetStatus(id, val) {
   const it = AL_ITEMS.find(i=>i.id===id);
-  if(it) { it.상태=val; alSave(); }
+  if(it) { it.상태=val; alPersist({render:false}); }
 }
 
 function alOpenMemo(id) {
@@ -2637,7 +2678,7 @@ function alOpenMemo(id) {
 function alCloseMemo() { document.getElementById('al-memo-modal').classList.remove('open'); _alMemoId=null; }
 function alSaveMemo() {
   const it = AL_ITEMS.find(i=>i.id===_alMemoId);
-  if(it) { it.비고=document.getElementById('al-memo-input').value.trim(); alSave(); alRender(); }
+  if(it) { it.비고=document.getElementById('al-memo-input').value.trim(); alPersist(); }
   alCloseMemo();
 }
 
@@ -2650,7 +2691,7 @@ function alOpenDate(id) {
 function alCloseDate() { document.getElementById('al-date-modal').classList.remove('open'); _alDateId=null; }
 function alSaveDate() {
   const it = AL_ITEMS.find(i=>i.id===_alDateId);
-  if(it) { it.일정=document.getElementById('al-date-input').value; alSave(); alRender(); }
+  if(it) { it.일정=document.getElementById('al-date-input').value; alPersist(); }
   alCloseDate();
 }
 
