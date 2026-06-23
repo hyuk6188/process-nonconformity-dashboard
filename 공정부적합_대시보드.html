@@ -195,8 +195,7 @@
   .al-table th:nth-child(7),.al-table td:nth-child(7){width:110px}
   .al-table th:nth-child(8),.al-table td:nth-child(8){width:132px;text-align:center}
   .al-table th:nth-child(9),.al-table td:nth-child(9){width:112px;text-align:center}
-  .al-table th:nth-child(10),.al-table td:nth-child(10){width:132px;text-align:center}
-  .al-table th:nth-child(11),.al-table td:nth-child(11){width:48px;text-align:center}
+  .al-table th:nth-child(10),.al-table td:nth-child(10){width:190px;text-align:center}
   .al-table td:nth-child(3),.al-table td:nth-child(4),.al-table td:nth-child(5){overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .al-badge{display:inline-flex;align-items:center;justify-content:center;border-radius:50%;width:24px;height:24px;line-height:1;text-align:center;font-size:12px;font-weight:700;color:#fff;vertical-align:middle}
   .al-badge.상{background:#e53935}.al-badge.중{background:#fb8c00}.al-badge.하{background:#90a4ae}
@@ -205,6 +204,12 @@
   .al-status{height:32px;min-width:76px;background:var(--surface-2);border:0.5px solid var(--border);border-radius:6px;color:var(--text);padding:0 8px;font-size:13px;vertical-align:middle;box-sizing:border-box}
   .al-memo-btn{height:32px;min-width:78px;background:var(--surface-2);border:0.5px solid var(--border);border-radius:6px;color:var(--text-2);padding:0 10px;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;vertical-align:middle;box-sizing:border-box}
   .al-memo-btn.set{color:#f59e0b;border-color:#f59e0b}
+  .al-actions{display:inline-flex;align-items:center;justify-content:center;gap:6px;white-space:nowrap}
+  .al-edit-btn,.al-row-del-btn{height:32px;background:var(--surface-2);border:0.5px solid var(--border);border-radius:6px;padding:0 10px;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box}
+  .al-edit-btn{color:#1a56db;border-color:rgba(26,86,219,.28)}
+  .al-row-del-btn{color:#e53935;border-color:rgba(229,57,53,.28)}
+  .al-edit-btn:hover{background:rgba(26,86,219,.08);border-color:#1a56db}
+  .al-row-del-btn:hover{background:rgba(229,57,53,.08);border-color:#e53935}
   .al-del-btn{width:28px;height:28px;background:none;border:none;color:var(--text-3);cursor:pointer;font-size:15px;padding:0;display:inline-flex;align-items:center;justify-content:center;vertical-align:middle}
   .al-del-btn:hover{color:#e53935}
 
@@ -716,7 +721,7 @@
   <table class="al-table">
     <thead><tr>
       <th>No</th><th>구분</th><th>공정/설비명</th><th>증상</th><th>점검사항</th>
-      <th>중요도</th><th>담당자</th><th>일정</th><th>상태</th><th>비고</th><th></th>
+      <th>중요도</th><th>담당자</th><th>일정</th><th>상태</th><th>비고</th>
     </tr></thead>
     <tbody id="al-tbody"></tbody>
   </table>
@@ -736,7 +741,7 @@
 <!-- 점검 항목 추가 모달 -->
 <div id="al-modal" onclick="if(event.target===this)alCloseAdd()">
   <div id="al-modal-box">
-    <h3>점검 항목 추가</h3>
+    <h3 id="al-modal-title">점검 항목 추가</h3>
     <div class="al-field"><label>구분</label>
       <select id="al-cat"><option>엣지</option><option>보링</option><option>기타</option></select></div>
     <div class="al-field"><label>공정/설비명</label><input id="al-equip" placeholder="공정/설비명 입력"></div>
@@ -748,7 +753,7 @@
     <div class="al-field"><label>일정</label><input type="date" id="al-add-date"></div>
     <div class="al-modal-btns">
       <button class="al-modal-cancel" onclick="alCloseAdd()">취소</button>
-      <button class="al-modal-save" onclick="alSaveAdd()">추가</button>
+      <button class="al-modal-save" id="al-modal-save-btn" onclick="alSaveAdd()">추가</button>
     </div>
   </div>
 </div>
@@ -2539,7 +2544,7 @@ initYearSelectors();
 // ── ACTION LIST ──────────────────────────────────────────
 const AL_KEY = 'action_list_v1';
 let AL_ITEMS = JSON.parse(localStorage.getItem(AL_KEY) || '[]');
-let _alMemoId = null, _alDateId = null;
+let _alMemoId = null, _alDateId = null, _alEditId = null;
 
 // 특이사항 복원
 (function() {
@@ -2597,7 +2602,7 @@ function alRender() {
   // 테이블
   const tbody = document.getElementById('al-tbody');
   if(!filtered.length) {
-    tbody.innerHTML = `<tr><td colspan="11" style="text-align:center;padding:24px;color:#475569">점검 항목이 없습니다</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:24px;color:#475569">점검 항목이 없습니다</td></tr>`;
     return;
   }
   tbody.innerHTML = filtered.map((it,i) => {
@@ -2608,6 +2613,11 @@ function alRender() {
     const memoBtn = it.비고
       ? `<button class="al-memo-btn set" onclick="alOpenMemo('${it.id}')" title="${it.비고}">비고 ✓</button>`
       : '';
+    const rowActions = `<div class="al-actions">
+      ${memoBtn}
+      <button class="al-edit-btn" onclick="alOpenEdit('${it.id}')">수정</button>
+      <button class="al-row-del-btn" onclick="alDelete('${it.id}')">삭제</button>
+    </div>`;
     const statusSel = `<select class="al-status" onchange="alSetStatus('${it.id}',this.value)">
       ${['대기','진행중','완료'].map(s=>`<option${s===it.상태?' selected':''}>${s}</option>`).join('')}
     </select>`;
@@ -2621,8 +2631,7 @@ function alRender() {
       <td>${it.담당자||''}</td>
       <td>${dateBtn}</td>
       <td>${statusSel}</td>
-      <td>${memoBtn}</td>
-      <td><button class="al-del-btn" onclick="alDelete('${it.id}')">✕</button></td>
+      <td>${rowActions}</td>
     </tr>`;
   }).join('');
 }
@@ -2636,33 +2645,69 @@ function alResetFilters() {
   alRender();
 }
 
+function alSetModalMode(mode) {
+  const isEdit = mode === 'edit';
+  const title = document.getElementById('al-modal-title');
+  const saveBtn = document.getElementById('al-modal-save-btn');
+  if(title) title.textContent = isEdit ? '점검 항목 수정' : '점검 항목 추가';
+  if(saveBtn) saveBtn.textContent = isEdit ? '수정' : '추가';
+}
+
+function alClearForm() {
+  document.getElementById('al-cat').value='엣지';
+  document.getElementById('al-equip').value='';
+  document.getElementById('al-check').value='';
+  document.getElementById('al-symptom').value='';
+  document.getElementById('al-priority').value='상';
+  document.getElementById('al-user').value='';
+  document.getElementById('al-add-date').value='';
+}
+
 function alOpenAdd() {
+  _alEditId = null;
+  alSetModalMode('add');
   const dateEl = document.getElementById('al-add-date');
   if(dateEl && !dateEl.value) dateEl.value = new Date().toISOString().slice(0,10);
   document.getElementById('al-modal').classList.add('open');
 }
-function alCloseAdd() { document.getElementById('al-modal').classList.remove('open'); }
+function alCloseAdd() { document.getElementById('al-modal').classList.remove('open'); _alEditId = null; }
 function alSaveAdd() {
   const equip = document.getElementById('al-equip').value.trim();
   const check = document.getElementById('al-check').value.trim();
   const schedule = document.getElementById('al-add-date')?.value || '';
   if(!equip||!check) { alert('공정/설비명과 점검사항은 필수입니다.'); return; }
-  AL_ITEMS.push({
-    id: Date.now().toString(),
+  const payload = {
     구분: document.getElementById('al-cat').value,
     설비명: equip,
     점검사항: check,
     증상: document.getElementById('al-symptom').value.trim(),
     중요도: document.getElementById('al-priority').value,
     담당자: document.getElementById('al-user').value.trim(),
-    일정:schedule, 상태:'대기', 비고:''
-  });
+    일정:schedule
+  };
+  if(_alEditId) {
+    const it = AL_ITEMS.find(i=>i.id===_alEditId);
+    if(it) Object.assign(it, payload);
+  } else {
+    AL_ITEMS.push({id: Date.now().toString(), ...payload, 상태:'대기', 비고:''});
+  }
   alPersist(); alCloseAdd();
-  document.getElementById('al-equip').value='';
-  document.getElementById('al-check').value='';
-  document.getElementById('al-symptom').value='';
-  document.getElementById('al-user').value='';
-  document.getElementById('al-add-date').value='';
+  alClearForm();
+}
+
+function alOpenEdit(id) {
+  const it = AL_ITEMS.find(i=>i.id===id);
+  if(!it) return;
+  _alEditId = id;
+  alSetModalMode('edit');
+  document.getElementById('al-cat').value = it.구분 || '엣지';
+  document.getElementById('al-equip').value = it.설비명 || '';
+  document.getElementById('al-check').value = it.점검사항 || '';
+  document.getElementById('al-symptom').value = it.증상 || '';
+  document.getElementById('al-priority').value = it.중요도 || '상';
+  document.getElementById('al-user').value = it.담당자 || '';
+  document.getElementById('al-add-date').value = it.일정 || '';
+  document.getElementById('al-modal').classList.add('open');
 }
 
 function alDelete(id) {
