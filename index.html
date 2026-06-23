@@ -745,6 +745,7 @@
     <div class="al-field"><label>중요도</label>
       <select id="al-priority"><option>상</option><option>중</option><option>하</option></select></div>
     <div class="al-field"><label>담당자</label><input id="al-user" placeholder="담당자 입력"></div>
+    <div class="al-field"><label>일정</label><input type="date" id="al-add-date"></div>
     <div class="al-modal-btns">
       <button class="al-modal-cancel" onclick="alCloseAdd()">취소</button>
       <button class="al-modal-save" onclick="alSaveAdd()">추가</button>
@@ -2635,11 +2636,16 @@ function alResetFilters() {
   alRender();
 }
 
-function alOpenAdd() { document.getElementById('al-modal').classList.add('open'); }
+function alOpenAdd() {
+  const dateEl = document.getElementById('al-add-date');
+  if(dateEl && !dateEl.value) dateEl.value = new Date().toISOString().slice(0,10);
+  document.getElementById('al-modal').classList.add('open');
+}
 function alCloseAdd() { document.getElementById('al-modal').classList.remove('open'); }
 function alSaveAdd() {
   const equip = document.getElementById('al-equip').value.trim();
   const check = document.getElementById('al-check').value.trim();
+  const schedule = document.getElementById('al-add-date')?.value || '';
   if(!equip||!check) { alert('공정/설비명과 점검사항은 필수입니다.'); return; }
   AL_ITEMS.push({
     id: Date.now().toString(),
@@ -2649,13 +2655,14 @@ function alSaveAdd() {
     증상: document.getElementById('al-symptom').value.trim(),
     중요도: document.getElementById('al-priority').value,
     담당자: document.getElementById('al-user').value.trim(),
-    일정:'', 상태:'대기', 비고:''
+    일정:schedule, 상태:'대기', 비고:''
   });
   alPersist(); alCloseAdd();
   document.getElementById('al-equip').value='';
   document.getElementById('al-check').value='';
   document.getElementById('al-symptom').value='';
   document.getElementById('al-user').value='';
+  document.getElementById('al-add-date').value='';
 }
 
 function alDelete(id) {
