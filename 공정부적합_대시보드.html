@@ -2607,7 +2607,7 @@ function alRender() {
       : `<button class="al-date-btn" onclick="alOpenDate('${it.id}')">일정 입력</button>`;
     const memoBtn = it.비고
       ? `<button class="al-memo-btn set" onclick="alOpenMemo('${it.id}')" title="${it.비고}">비고 ✓</button>`
-      : `<button class="al-memo-btn" onclick="alOpenMemo('${it.id}')">비고 입력</button>`;
+      : '';
     const statusSel = `<select class="al-status" onchange="alSetStatus('${it.id}',this.value)">
       ${['대기','진행중','완료'].map(s=>`<option${s===it.상태?' selected':''}>${s}</option>`).join('')}
     </select>`;
