@@ -109,17 +109,10 @@
   .sub-row{display:flex;align-items:center;padding:7px 14px 7px 50px;border-top:1px solid var(--border);background:var(--bg);gap:8px}
   .period-breakdown{border-top:1px solid var(--border);background:var(--surface-2);padding:8px 14px 8px 50px}
   .period-breakdown-title{font-size:13px;font-weight:700;color:var(--text);margin-bottom:5px}
-  .period-breakdown-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
-  .period-breakdown-box{border:1px solid var(--border);border-radius:8px;background:var(--surface);overflow:hidden;min-width:0}
-  .period-breakdown-head{padding:7px 9px;font-size:13px;font-weight:800;color:var(--text);border-bottom:1px solid var(--border);background:var(--bg)}
-  .period-breakdown-empty{padding:10px 9px;font-size:12px;color:var(--text-3);text-align:center}
   .period-breakdown-row{display:grid;grid-template-columns:minmax(120px,1fr) 90px 120px;align-items:center;gap:12px;padding:5px 8px;border-top:1px solid var(--border);font-size:13px;color:var(--text-2)}
   .period-breakdown-row:first-of-type{border-top:0}
   .period-breakdown-label{font-weight:600;color:var(--text)}
   .period-breakdown-value{text-align:right;white-space:nowrap}
-  .period-breakdown-grid .period-breakdown-row{grid-template-columns:minmax(72px,1fr) 64px 92px;font-size:12px;gap:6px;padding:6px 8px}
-  @media(max-width:1100px){.period-breakdown-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
-  @media(max-width:640px){.period-breakdown-grid{grid-template-columns:1fr}.period-breakdown{padding-left:14px}}
   .sub-num{color:var(--text-3);font-size:11px;width:16px;flex-shrink:0}
   .sub-name{flex:1;font-size:14px;color:var(--text-2)}
   .sub-cnt{color:#e53935;font-weight:700;font-size:14px;min-width:60px;text-align:right}
@@ -923,102 +916,6 @@ function periodDetailLabel(period, item) {
   return label;
 }
 
-function detailScopePredicate(items) {
-  const keys = new Set((items || []).map(it => String((it && it.key) || '')).filter(k => k && !k.startsWith('__empty_')));
-  const dailyKeys = [...keys].filter(k => /^\d{4}-\d{2}-\d{2}$/.test(k));
-  if (dailyKeys.length) {
-    const allowed = new Set(dailyKeys);
-    return r => allowed.has(String(r['발생일'] || ''));
-  }
-  const weeklyKeys = [...keys].filter(k => /^\d{4}-W\d{2}$/.test(k));
-  if (weeklyKeys.length) {
-    const allowed = new Set(weeklyKeys);
-    return r => {
-      const date = String(r['발생일'] || '');
-      return date && allowed.has(weekKeyJS(date));
-    };
-  }
-  const monthlyKeys = [...keys].filter(k => /^\d{4}-\d{2}$/.test(k));
-  if (monthlyKeys.length) {
-    const allowed = new Set(monthlyKeys);
-    return r => allowed.has(String(r['발생일'] || '').slice(0, 7));
-  }
-  const yearlyKeys = [...keys].filter(k => /^\d{4}$/.test(k));
-  if (yearlyKeys.length) {
-    const allowed = new Set(yearlyKeys);
-    return r => allowed.has(String(r['발생일'] || '').slice(0, 4));
-  }
-  return () => true;
-}
-
-function detailDayLabel(dateText) {
-  const d = parseLocalDate(dateText);
-  if (!d || isNaN(d.getTime())) return dateText || '-';
-  const names = ['일','월','화','수','목','금','토'];
-  return `${d.getMonth() + 1}/${d.getDate()}(${names[d.getDay()]})`;
-}
-
-function detailWeekLabel(weekKey) {
-  if (!/^\d{4}-W\d{2}$/.test(String(weekKey || ''))) return weekKey || '-';
-  const wed = wedDateOfWeek(weekKey);
-  const y = String(wed.getFullYear());
-  const m = String(wed.getMonth() + 1).padStart(2, '0');
-  const monthWeeks = monthWeekKeys(y, m);
-  const idx = monthWeeks.indexOf(weekKey);
-  return `${wed.getFullYear()}년 ${wed.getMonth() + 1}월 ${idx >= 0 ? idx + 1 : parseInt(weekKey.slice(6), 10)}주`;
-}
-
-function buildTypePeriodRows(records, mode) {
-  const map = {};
-  records.forEach(r => {
-    const date = String(r['발생일'] || '');
-    if (!date) return;
-    let key = date, label = detailDayLabel(date);
-    if (mode === 'weekly') {
-      key = weekKeyJS(date);
-      label = detailWeekLabel(key);
-    } else if (mode === 'monthly') {
-      key = date.slice(0, 7);
-      label = `${key.slice(0, 4)}년 ${parseInt(key.slice(5), 10)}월`;
-    } else if (mode === 'yearly') {
-      key = date.slice(0, 4);
-      label = `${key}년`;
-    }
-    if (!map[key]) map[key] = {key, label, cnt:0, qty:0, amt:0};
-    map[key].cnt += 1;
-    map[key].qty += Number(r['부적합수량']) || 0;
-    map[key].amt += Number(r['금액']) || 0;
-  });
-  return Object.values(map).sort((a, b) => String(a.key).localeCompare(String(b.key), 'ko'));
-}
-
-function typePeriodBreakdownHtml(typeName, items) {
-  const inScope = detailScopePredicate(items);
-  const records = (RAW_DATA || []).filter(r => inScope(r) && ((r['부적합유형'] || r['부적합상세정보'] || r['공정부적합명'] || '미기재') === typeName));
-  const modes = [
-    ['일별', 'daily'],
-    ['주별', 'weekly'],
-    ['월별', 'monthly'],
-    ['연별', 'yearly']
-  ];
-  return `<div class="period-breakdown">
-    <div class="period-breakdown-title">유형별 기간 현황</div>
-    <div class="period-breakdown-grid">
-      ${modes.map(([title, mode]) => {
-        const rows = buildTypePeriodRows(records, mode);
-        return `<div class="period-breakdown-box">
-          <div class="period-breakdown-head">${title}</div>
-          ${rows.length ? rows.map(row => `<div class="period-breakdown-row">
-            <span class="period-breakdown-label">${escapeHtml(row.label)}</span>
-            <span class="period-breakdown-value">${row.qty.toLocaleString()}ea</span>
-            <span class="period-breakdown-value">${row.amt.toLocaleString()}원</span>
-          </div>`).join('') : '<div class="period-breakdown-empty">자료 없음</div>'}
-        </div>`;
-      }).join('')}
-    </div>
-  </div>`;
-}
-
 function renderPeriodTable(wrapId, items, color, period) {
   const wrap = document.getElementById(wrapId);
   if (!wrap) return;
@@ -1065,6 +962,7 @@ function renderPeriodTable(wrapId, items, color, period) {
     const isColor = tv.groupKey === 'color';
     const subLabel = isColor ? '색상' : '설비명';
     const subs = Object.entries(tv.byName).sort((a,b)=>b[1].qty-a[1].qty || b[1].amt-a[1].amt || b[1].cnt-a[1].cnt);
+    const periods = Object.entries(tv.byPeriod || {}).sort((a,b)=>String(a[0]).localeCompare(String(b[0]), 'ko'));
     html += `<div class="type-group">
       <div class="type-row" onclick="toggleGroup('${uid}')">
         <span class="type-bar" style="background:${c}"></span>
@@ -1075,7 +973,16 @@ function renderPeriodTable(wrapId, items, color, period) {
         <span class="type-arr" id="arr-${uid}">▼</span>
       </div>
       <div id="sub-${uid}" style="display:none">`;
-    html += typePeriodBreakdownHtml(t, items || []);
+    if (periods.length) {
+      html += `<div class="period-breakdown">
+        <div class="period-breakdown-title">${period || '기간'} 날짜별 현황</div>
+        ${periods.map(([, pv]) => `<div class="period-breakdown-row">
+          <span class="period-breakdown-label">${escapeHtml(pv.label)}</span>
+          <span class="period-breakdown-value">${pv.qty.toLocaleString()}ea</span>
+          <span class="period-breakdown-value">${pv.amt.toLocaleString()}원</span>
+        </div>`).join('')}
+      </div>`;
+    }
     subs.forEach(([n, nv], j) => {
       const icon = isColor
         ? `<span style="font-size:12px;margin-right:4px;flex-shrink:0">🎨</span>`
