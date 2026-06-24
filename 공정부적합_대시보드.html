@@ -2617,6 +2617,14 @@ function actionListVisibleItem(it) {
   return doneMonth >= currentMonthKey();
 }
 
+function sortBySchedule(items) {
+  return [...(items || [])].sort((a,b) => {
+    const ad = a.일정 || '9999-12-31';
+    const bd = b.일정 || '9999-12-31';
+    return String(ad).localeCompare(String(bd)) || String(a.설비명 || '').localeCompare(String(b.설비명 || ''), 'ko');
+  });
+}
+
 function alBuildRow(it, i) {
   const badge = `<span class="al-badge ${it.중요도||'하'}">${it.중요도||'하'}</span>`;
   const dateBtn = it.일정
@@ -2691,7 +2699,7 @@ function alRender() {
     renderHistory();
     return;
   }
-  tbody.innerHTML = filtered.map(alBuildRow).join('');
+  tbody.innerHTML = sortBySchedule(filtered).map(alBuildRow).join('');
   renderHistory();
 }
 
@@ -2732,7 +2740,7 @@ function renderHistory() {
     tbody.innerHTML = `<tr><td colspan="10"><div class="hist-empty">완료된 개선 이력이 없습니다</div></td></tr>`;
     return;
   }
-  tbody.innerHTML = filtered.map(alBuildRow).join('');
+  tbody.innerHTML = sortBySchedule(filtered).map(alBuildRow).join('');
 }
 
 function resetHistoryFilters() {
