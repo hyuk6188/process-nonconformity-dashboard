@@ -180,6 +180,8 @@
   .al-filters select{min-width:110px}
   .al-reset{background:var(--surface-2);color:var(--text-2);border:0.5px solid var(--border);border-radius:7px;padding:8px 14px;font-size:14px;cursor:pointer}
   .al-reset:hover{background:var(--border)}
+  .hist-summary{font-size:13px;color:var(--text-3);margin-top:4px}
+  .hist-empty{padding:34px 16px;text-align:center;color:var(--text-3);border-top:0.5px solid var(--border)}
   .al-table{width:100%;border-collapse:collapse;table-layout:fixed;font-size:14px}
   .al-table thead tr{background:var(--surface-2)}
   .al-table thead th{height:38px;padding:0 12px;text-align:left;color:var(--text-2);font-weight:700;white-space:nowrap;border-bottom:0.5px solid var(--border);vertical-align:middle;box-sizing:border-box}
@@ -566,6 +568,7 @@
   <div class="tab" onclick="showPage('weekly')">주별</div>
   <div class="tab" onclick="showPage('monthly')">월별</div>
   <div class="tab" onclick="showPage('yearly')">연별</div>
+  <div class="tab" onclick="showPage('history')">개선 이력</div>
 </div>
 
 <!-- ════════════ 일별 탭 ════════════ -->
@@ -695,8 +698,36 @@
 
 </div>
 
+<!-- ════════════ 개선 이력 탭 ════════════ -->
+<div id="page-history" class="page exec-page" style="padding:20px 24px">
+  <div class="al-wrap" style="margin:0">
+    <div class="al-header">
+      <div>
+        <div class="al-title">개선 이력</div>
+        <div class="hist-summary" id="hist-summary">완료된 개선 항목 0건</div>
+      </div>
+    </div>
+    <div class="al-kpis" id="hist-kpis"></div>
+    <div class="al-filters">
+      <input id="hist-search" placeholder="완료 이력 검색: 공정/설비명, 증상, 점검사항, 담당자" oninput="renderHistory()">
+      <select id="hist-f-cat" onchange="renderHistory()">
+        <option value="">전체 구분</option>
+        <option>엣지</option><option>보링</option><option>기타</option>
+      </select>
+      <button class="al-reset" onclick="resetHistoryFilters()">초기화</button>
+    </div>
+    <table class="al-table">
+      <thead><tr>
+        <th>No</th><th>구분</th><th>공정/설비명</th><th>증상</th><th>점검사항</th>
+        <th>중요도</th><th>담당자</th><th>일정</th><th>상태</th><th>비고</th>
+      </tr></thead>
+      <tbody id="hist-tbody"></tbody>
+    </table>
+  </div>
+</div>
+
 <!-- ══ ACTION LIST (모든 탭 공통) ══ -->
-<div class="al-wrap" style="margin:0 24px 28px">
+<div class="al-wrap" id="action-list-wrap" style="margin:0 24px 28px">
   <div class="al-header">
     <div>
       <div class="al-title">공정 및 설비 개선 현황</div>
@@ -839,7 +870,10 @@ function showPage(id) {
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   document.getElementById('page-'+id).classList.add('active');
   event.target.classList.add('active');
+  const actionWrap = document.getElementById('action-list-wrap');
+  if(actionWrap) actionWrap.style.display = id === 'history' ? 'none' : '';
   if(!_drawn[id]) { _drawn[id]=true; _drawTab(id); }
+  if(id === 'history') renderHistory();
 }
 
 function _drawTab(id) {
@@ -847,6 +881,7 @@ function _drawTab(id) {
   else if(id==='weekly') drawWeekly();
   else if(id==='monthly') drawMonthly();
   else if(id==='yearly') drawYearly();
+  else if(id==='history') renderHistory();
 }
 
 // ── 전체 기간 데이터 (필터용) ────────────────────────────
@@ -2560,7 +2595,38 @@ function alSave() {
 function alPersist({render=true, sync=true} = {}) {
   alSave();
   if(render) alRender();
+  renderHistory();
   if(sync) syncActionListDebounced();
+}
+
+function alBuildRow(it, i) {
+  const badge = `<span class="al-badge ${it.중요도||'하'}">${it.중요도||'하'}</span>`;
+  const dateBtn = it.일정
+    ? `<button class="al-date-btn set" onclick="alOpenDate('${it.id}')">${it.일정}</button>`
+    : `<button class="al-date-btn" onclick="alOpenDate('${it.id}')">일정 입력</button>`;
+  const memoBtn = it.비고
+    ? `<button class="al-memo-btn set" onclick="alOpenMemo('${it.id}')" title="${it.비고}">비고 ✓</button>`
+    : '';
+  const rowActions = `<div class="al-actions">
+    ${memoBtn}
+    <button class="al-edit-btn" onclick="alOpenEdit('${it.id}')">수정</button>
+    <button class="al-row-del-btn" onclick="alDelete('${it.id}')">삭제</button>
+  </div>`;
+  const statusSel = `<select class="al-status" onchange="alSetStatus('${it.id}',this.value)">
+    ${['대기','진행중','완료'].map(s=>`<option${s===it.상태?' selected':''}>${s}</option>`).join('')}
+  </select>`;
+  return `<tr>
+    <td style="color:#64748b">${i+1}</td>
+    <td>${it.구분||''}</td>
+    <td style="font-weight:500">${it.설비명||''}</td>
+    <td style="color:var(--text)">${it.증상||''}</td>
+    <td>${it.점검사항||''}</td>
+    <td style="text-align:center">${badge}</td>
+    <td>${it.담당자||''}</td>
+    <td>${dateBtn}</td>
+    <td>${statusSel}</td>
+    <td>${rowActions}</td>
+  </tr>`;
 }
 
 function alRender() {
@@ -2603,37 +2669,11 @@ function alRender() {
   const tbody = document.getElementById('al-tbody');
   if(!filtered.length) {
     tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:24px;color:#475569">점검 항목이 없습니다</td></tr>`;
+    renderHistory();
     return;
   }
-  tbody.innerHTML = filtered.map((it,i) => {
-    const badge = `<span class="al-badge ${it.중요도||'하'}">${it.중요도||'하'}</span>`;
-    const dateBtn = it.일정
-      ? `<button class="al-date-btn set" onclick="alOpenDate('${it.id}')">${it.일정}</button>`
-      : `<button class="al-date-btn" onclick="alOpenDate('${it.id}')">일정 입력</button>`;
-    const memoBtn = it.비고
-      ? `<button class="al-memo-btn set" onclick="alOpenMemo('${it.id}')" title="${it.비고}">비고 ✓</button>`
-      : '';
-    const rowActions = `<div class="al-actions">
-      ${memoBtn}
-      <button class="al-edit-btn" onclick="alOpenEdit('${it.id}')">수정</button>
-      <button class="al-row-del-btn" onclick="alDelete('${it.id}')">삭제</button>
-    </div>`;
-    const statusSel = `<select class="al-status" onchange="alSetStatus('${it.id}',this.value)">
-      ${['대기','진행중','완료'].map(s=>`<option${s===it.상태?' selected':''}>${s}</option>`).join('')}
-    </select>`;
-    return `<tr>
-      <td style="color:#64748b">${i+1}</td>
-      <td>${it.구분||''}</td>
-      <td style="font-weight:500">${it.설비명||''}</td>
-      <td style="color:var(--text)">${it.증상||''}</td>
-      <td>${it.점검사항||''}</td>
-      <td style="text-align:center">${badge}</td>
-      <td>${it.담당자||''}</td>
-      <td>${dateBtn}</td>
-      <td>${statusSel}</td>
-      <td>${rowActions}</td>
-    </tr>`;
-  }).join('');
+  tbody.innerHTML = filtered.map(alBuildRow).join('');
+  renderHistory();
 }
 
 function alResetFilters() {
@@ -2643,6 +2683,45 @@ function alResetFilters() {
   document.getElementById('al-f-user').value='';
   document.getElementById('al-f-status').value='';
   alRender();
+}
+
+function renderHistory() {
+  const tbody = document.getElementById('hist-tbody');
+  if(!tbody) return;
+  const search = (document.getElementById('hist-search')?.value||'').toLowerCase();
+  const fCat = document.getElementById('hist-f-cat')?.value || '';
+  const completed = AL_ITEMS.filter(it => (it.상태 || '') === '완료');
+  const filtered = completed.filter(it => {
+    if(fCat && it.구분 !== fCat) return false;
+    if(search) {
+      const hay = (it.설비명 + it.점검사항 + it.증상 + it.담당자 + (it.비고 || '')).toLowerCase();
+      if(!hay.includes(search)) return false;
+    }
+    return true;
+  });
+  const summary = document.getElementById('hist-summary');
+  if(summary) summary.textContent = '완료된 개선 항목 ' + completed.length.toLocaleString() + '건';
+  const cats = {'완료 합계': completed.length, '엣지':0, '보링':0, '기타':0};
+  completed.forEach(it => { if(cats[it.구분] !== undefined) cats[it.구분]++; else cats['기타']++; });
+  const kpis = document.getElementById('hist-kpis');
+  if(kpis) {
+    kpis.innerHTML = Object.entries(cats).map(([k,v]) =>
+      `<div class="al-kpi"><div class="al-kpi-val">${v}</div><div class="al-kpi-lbl">${k === '완료 합계' ? '완료 합계' : k + ' 완료'}</div></div>`
+    ).join('');
+  }
+  if(!filtered.length) {
+    tbody.innerHTML = `<tr><td colspan="10"><div class="hist-empty">완료된 개선 이력이 없습니다</div></td></tr>`;
+    return;
+  }
+  tbody.innerHTML = filtered.map(alBuildRow).join('');
+}
+
+function resetHistoryFilters() {
+  const search = document.getElementById('hist-search');
+  const cat = document.getElementById('hist-f-cat');
+  if(search) search.value = '';
+  if(cat) cat.value = '';
+  renderHistory();
 }
 
 function alSetModalMode(mode) {
@@ -2718,7 +2797,7 @@ function alDelete(id) {
 
 function alSetStatus(id, val) {
   const it = AL_ITEMS.find(i=>i.id===id);
-  if(it) { it.상태=val; alPersist({render:false}); }
+  if(it) { it.상태=val; alPersist(); }
 }
 
 function alOpenMemo(id) {
