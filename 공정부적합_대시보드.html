@@ -2599,6 +2599,24 @@ function alPersist({render=true, sync=true} = {}) {
   if(sync) syncActionListDebounced();
 }
 
+function monthKeyFromDate(value) {
+  const text = String(value || '');
+  const match = text.match(/^(\d{4})-(\d{2})/);
+  return match ? match[1] + '-' + match[2] : '';
+}
+
+function currentMonthKey() {
+  const now = new Date();
+  return now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+}
+
+function actionListVisibleItem(it) {
+  if((it.상태 || '') !== '완료') return true;
+  const doneMonth = monthKeyFromDate(it.완료일 || it.일정);
+  if(!doneMonth) return true;
+  return doneMonth >= currentMonthKey();
+}
+
 function alBuildRow(it, i) {
   const badge = `<span class="al-badge ${it.중요도||'하'}">${it.중요도||'하'}</span>`;
   const dateBtn = it.일정
@@ -2636,7 +2654,8 @@ function alRender() {
   const fUser   = document.getElementById('al-f-user')?.value||'';
   const fStatus = document.getElementById('al-f-status')?.value||'';
 
-  const filtered = AL_ITEMS.filter(it => {
+  const visibleItems = AL_ITEMS.filter(actionListVisibleItem);
+  const filtered = visibleItems.filter(it => {
     if(fEquip  && it.설비명!==fEquip) return false;
     if(fCat    && it.구분!==fCat) return false;
     if(fUser   && it.담당자!==fUser) return false;
@@ -2649,15 +2668,15 @@ function alRender() {
   });
 
   // KPI
-  const cats = {'총':AL_ITEMS.length,'엣지':0,'보링':0,'기타':0};
-  AL_ITEMS.forEach(it => { if(cats[it.구분]!==undefined) cats[it.구분]++; else cats['기타']++; });
+  const cats = {'총':visibleItems.length,'엣지':0,'보링':0,'기타':0};
+  visibleItems.forEach(it => { if(cats[it.구분]!==undefined) cats[it.구분]++; else cats['기타']++; });
   document.getElementById('al-kpis').innerHTML = Object.entries(cats).map(([k,v])=>
     `<div class="al-kpi"><div class="al-kpi-val">${v}</div><div class="al-kpi-lbl">${k === '총' ? '총 항목' : k + ' 항목'}</div></div>`
   ).join('');
 
   // 공정/설비명/담당자 필터 옵션 갱신
-  const equips = [...new Set(AL_ITEMS.map(i=>i.설비명).filter(Boolean))];
-  const users  = [...new Set(AL_ITEMS.map(i=>i.담당자).filter(Boolean))];
+  const equips = [...new Set(visibleItems.map(i=>i.설비명).filter(Boolean))];
+  const users  = [...new Set(visibleItems.map(i=>i.담당자).filter(Boolean))];
   const se = document.getElementById('al-f-equip');
   const sv = se.value;
   se.innerHTML = '<option value="">전체 공정/설비명</option>' + equips.map(e=>`<option${e===sv?' selected':''}>${e}</option>`).join('');
@@ -2797,7 +2816,15 @@ function alDelete(id) {
 
 function alSetStatus(id, val) {
   const it = AL_ITEMS.find(i=>i.id===id);
-  if(it) { it.상태=val; alPersist(); }
+  if(it) {
+    it.상태=val;
+    if(val === '완료') {
+      if(!it.완료일) it.완료일 = new Date().toISOString().slice(0,10);
+    } else {
+      delete it.완료일;
+    }
+    alPersist();
+  }
 }
 
 function alOpenMemo(id) {
