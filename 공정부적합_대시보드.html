@@ -187,6 +187,8 @@
   .al-table thead th{height:38px;padding:0 12px;text-align:left;color:var(--text-2);font-weight:700;white-space:nowrap;border-bottom:0.5px solid var(--border);vertical-align:middle;box-sizing:border-box}
   .al-table tbody tr{border-bottom:0.5px solid var(--border);height:54px}
   .al-table tbody tr:hover{background:var(--surface-2)}
+  .al-table tbody tr.al-complete-row{background:#fff1f1}
+  .al-table tbody tr.al-complete-row:hover{background:#ffe7e7}
   .al-table td{height:54px;padding:0 12px;vertical-align:middle;color:var(--text);box-sizing:border-box;line-height:1.35}
   .al-table th:nth-child(1),.al-table td:nth-child(1){width:54px;text-align:left;color:#64748b}
   .al-table th:nth-child(2),.al-table td:nth-child(2){width:100px}
@@ -2626,6 +2628,7 @@ function sortBySchedule(items) {
 }
 
 function alBuildRow(it, i) {
+  const rowClass = (it.상태 || '') === '완료' ? ' class="al-complete-row"' : '';
   const badge = `<span class="al-badge ${it.중요도||'하'}">${it.중요도||'하'}</span>`;
   const dateBtn = it.일정
     ? `<button class="al-date-btn set" onclick="alOpenDate('${it.id}')">${it.일정}</button>`
@@ -2641,7 +2644,7 @@ function alBuildRow(it, i) {
   const statusSel = `<select class="al-status" onchange="alSetStatus('${it.id}',this.value)">
     ${['대기','진행중','완료'].map(s=>`<option${s===it.상태?' selected':''}>${s}</option>`).join('')}
   </select>`;
-  return `<tr>
+  return `<tr${rowClass}>
     <td style="color:#64748b">${i+1}</td>
     <td>${it.구분||''}</td>
     <td style="font-weight:500">${it.설비명||''}</td>
