@@ -2583,10 +2583,10 @@ function alRender() {
   });
 
   // KPI
-  const cats = {'엣지':0,'보링':0,'기타':0};
+  const cats = {'총':AL_ITEMS.length,'엣지':0,'보링':0,'기타':0};
   AL_ITEMS.forEach(it => { if(cats[it.구분]!==undefined) cats[it.구분]++; else cats['기타']++; });
   document.getElementById('al-kpis').innerHTML = Object.entries(cats).map(([k,v])=>
-    `<div class="al-kpi"><div class="al-kpi-val">${v}</div><div class="al-kpi-lbl">${k} 항목</div></div>`
+    `<div class="al-kpi"><div class="al-kpi-val">${v}</div><div class="al-kpi-lbl">${k === '총' ? '총 항목' : k + ' 항목'}</div></div>`
   ).join('');
 
   // 공정/설비명/담당자 필터 옵션 갱신
