@@ -1438,6 +1438,19 @@ function parseLocalDate(dateStr) {
   return new Date(y, (m || 1) - 1, d || 1);
 }
 
+function formatLocalDate(date) {
+  return date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0');
+}
+
+function businessDateForDefect(dateStr) {
+  const d = parseLocalDate(dateStr);
+  if (!d || isNaN(d.getTime())) return String(dateStr || '').slice(0, 10);
+  const dow = d.getDay();
+  if (dow === 6) d.setDate(d.getDate() - 1); // 토요일은 직전 금요일로 귀속
+  if (dow === 0) d.setDate(d.getDate() - 2); // 일요일은 직전 금요일로 귀속
+  return formatLocalDate(d);
+}
+
 function dayWeekLabel(dateStr) {
   const d = parseLocalDate(dateStr);
   const firstDow = (new Date(d.getFullYear(), d.getMonth(), 1).getDay() + 6) % 7; // Mon=0
@@ -1455,6 +1468,7 @@ function recordDateValue(r) {
 function latestRecordDate(records) {
   return (records || [])
     .map(recordDateValue)
+    .map(businessDateForDefect)
     .filter(Boolean)
     .sort()
     .pop() || '';
@@ -2508,7 +2522,7 @@ function reaggregate() {
     nv.items[itemName].cnt++; nv.items[itemName].qty += qty; nv.items[itemName].amt += amt;
   }
   RAW_DATA.forEach(r=>{
-    const date = r[text.date] || '';
+    const date = businessDateForDefect(r[text.date] || '');
     if(!date) return;
     const wk=weekKeyJS(date), mo=date.slice(0,7), yr=date.slice(0,4);
     [[D,date,date],[W,wk,wk],[M,mo,mo.replace('-','년 ')+'월'],[Y,yr,yr+'년']].forEach(([obj,k,lbl])=>addToBucket(ensureBucket(obj,k,lbl), r));
